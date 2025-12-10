@@ -93,14 +93,13 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
     }
   };
 
-  // --- CHANGED: Handle Key Down directly on the container ---
+  // --- NEW: Handle Key Down directly on the container ---
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
       if (hoverPos) {
         e.preventDefault();
+        e.stopPropagation();
         addGridLineAt(hoverPos.x, hoverPos.y);
-      } else {
-        console.log("Enter pressed, but no hover position found");
       }
     }
   };
