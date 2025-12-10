@@ -1,0 +1,5 @@
+{
+  "name": "AutoFoundation AI",
+  "description": "A structural engineering tool that converts architectural building plans into foundation layouts. Features interactive grid mapping, column placement, and generates technical specifications for Firebase/Python backend implementation.",
+  "requestFramePermissions": []
+}
