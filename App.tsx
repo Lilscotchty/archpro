@@ -4,6 +4,7 @@ import { CanvasEditor } from './components/CanvasEditor';
 import { BackendPreview } from './components/BackendPreview';
 import { AppStep, ProjectState, GridLine } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
+import { QRCodeCanvas } from 'qrcode.react';
 
 type HistoryState = Pick<ProjectState, 'gridLines' | 'columns'>;
 
@@ -11,6 +12,7 @@ function App() {
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [currentTool, setCurrentTool] = useState<'v-line' | 'h-line' | 'select' | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showQR, setShowQR] = useState(false); // New state for QR Modal
   
   const [project, setProject] = useState<ProjectState>({
     imageSrc: null,
@@ -131,9 +133,9 @@ function App() {
     setStep(AppStep.GENERATION);
     
     // --- CANVAS CONFIGURATION ---
-    const PPI = 300 / 25.4; // Pixels per mm (High Res ~11.8 px/mm)
-    const PAPER_W = 420; // A3 Width mm
-    const PAPER_H = 297; // A3 Height mm
+    const PPI = 300 / 25.4; 
+    const PAPER_W = 420; 
+    const PAPER_H = 297; 
     const CANVAS_W = PAPER_W * PPI;
     const CANVAS_H = PAPER_H * PPI;
     
@@ -147,17 +149,14 @@ function App() {
 
     const mmToPx = (mm: number) => (mm / scale) * PPI;
 
-    // --- ISO PEN WEIGHTS (Paper Space) ---
-    // These define line thickness in actual mm on the printed page, independent of scale.
-    const P_013 = 0.13 * PPI; // Ultra Thin (Hairline) - For Hatches/Reference
-    const P_018 = 0.18 * PPI; // Very Thin - For Dims/Grids
-    const P_025 = 0.25 * PPI; // Thin - For Text/Leaders
-    const P_035 = 0.35 * PPI; // Medium - For Footing Outlines
-    const P_050 = 0.50 * PPI; // Thick - For Wall Cuts
-    const P_070 = 0.70 * PPI; // Extra Thick - For Columns/Title Block
+    // ISO PEN WEIGHTS
+    const P_013 = 0.13 * PPI; 
+    const P_025 = 0.25 * PPI; 
+    const P_035 = 0.35 * PPI; 
+    const P_050 = 0.50 * PPI; 
     
-    const T_BODY = 2.5 * PPI; // 2.5mm Text Height
-    const T_HEAD = 5.0 * PPI; // 5.0mm Text Height
+    const T_BODY = 2.5 * PPI; 
+    const T_HEAD = 5.0 * PPI; 
     const BUBBLE_DIA = 10 * PPI; 
 
     const vLines = [...project.gridLines].filter(l => l.orientation === 'vertical').sort((a,b) => a.position - b.position);
@@ -207,106 +206,65 @@ function App() {
     const tPx = mmToPx(footingWidth + workingSpace);
     const bPx = mmToPx(footingWidth + (blindingOffset * 2));
 
-    // --- DRAWING LAYERS ---
-
-    // 1. Excavation/Trenches
+    // Drawing Layers
     connections.forEach(c => {
        const dx = c.x2 - c.x1; const dy = c.y2 - c.y1; const len = Math.sqrt(dx*dx + dy*dy);
        const nx = -dy/len; const ny = dx/len;
-
-       // Use P_013 (Hairline) for subtle reference lines
-       ctx.strokeStyle = '#94a3b8'; // Slate 400
-       ctx.lineWidth = P_013; 
-       ctx.setLineDash([]); // SOLID LINE
-       
+       ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = P_013; ctx.setLineDash([]); 
        ctx.beginPath(); ctx.moveTo(c.x1 + nx*tPx/2, c.y1 + ny*tPx/2); ctx.lineTo(c.x2 + nx*tPx/2, c.y2 + ny*tPx/2); ctx.stroke();
        ctx.beginPath(); ctx.moveTo(c.x1 - nx*tPx/2, c.y1 - ny*tPx/2); ctx.lineTo(c.x2 - nx*tPx/2, c.y2 - ny*tPx/2); ctx.stroke();
-       
-       // Optional Blinding line (lighter)
        ctx.strokeStyle = '#e2e8f0'; 
        ctx.beginPath(); ctx.moveTo(c.x1 + nx*bPx/2, c.y1 + ny*bPx/2); ctx.lineTo(c.x2 + nx*bPx/2, c.y2 + ny*bPx/2); ctx.stroke();
        ctx.beginPath(); ctx.moveTo(c.x1 - nx*bPx/2, c.y1 - ny*bPx/2); ctx.lineTo(c.x2 - nx*bPx/2, c.y2 - ny*bPx/2); ctx.stroke();
     });
 
-    // 2. Footing (Solid White Fill + Outline)
     ctx.setLineDash([]);
     connections.forEach(c => {
        const dx = c.x2 - c.x1; const dy = c.y2 - c.y1; const len = Math.sqrt(dx*dx + dy*dy);
        const nx = -dy/len; const ny = dx/len;
-       
        ctx.fillStyle = '#ffffff';
        ctx.beginPath();
-       ctx.moveTo(c.x1 + nx*fPx/2, c.y1 + ny*fPx/2);
-       ctx.lineTo(c.x2 + nx*fPx/2, c.y2 + ny*fPx/2);
-       ctx.lineTo(c.x2 - nx*fPx/2, c.y2 - ny*fPx/2);
-       ctx.lineTo(c.x1 - nx*fPx/2, c.y1 - ny*fPx/2);
-       ctx.closePath();
-       ctx.fill();
-       
-       ctx.strokeStyle = '#000000'; 
-       ctx.lineWidth = P_035; // Medium thickness for footing edge
-       ctx.stroke();
+       ctx.moveTo(c.x1 + nx*fPx/2, c.y1 + ny*fPx/2); ctx.lineTo(c.x2 + nx*fPx/2, c.y2 + ny*fPx/2);
+       ctx.lineTo(c.x2 - nx*fPx/2, c.y2 - ny*fPx/2); ctx.lineTo(c.x1 - nx*fPx/2, c.y1 - ny*fPx/2);
+       ctx.closePath(); ctx.fill();
+       ctx.strokeStyle = '#000000'; ctx.lineWidth = P_035; ctx.stroke();
     });
 
-    // 3. Walls (Solid Grey)
     connections.forEach(c => {
        const dx = c.x2 - c.x1; const dy = c.y2 - c.y1; const len = Math.sqrt(dx*dx + dy*dy);
        const nx = -dy/len; const ny = dx/len;
-       
        ctx.fillStyle = '#64748b'; 
        ctx.beginPath();
-       ctx.moveTo(c.x1 + nx*wPx/2, c.y1 + ny*wPx/2);
-       ctx.lineTo(c.x2 + nx*wPx/2, c.y2 + ny*wPx/2);
-       ctx.lineTo(c.x2 - nx*wPx/2, c.y2 - ny*wPx/2);
-       ctx.lineTo(c.x1 - nx*wPx/2, c.y1 - ny*wPx/2);
-       ctx.closePath();
-       ctx.fill();
+       ctx.moveTo(c.x1 + nx*wPx/2, c.y1 + ny*wPx/2); ctx.lineTo(c.x2 + nx*wPx/2, c.y2 + ny*wPx/2);
+       ctx.lineTo(c.x2 - nx*wPx/2, c.y2 - ny*wPx/2); ctx.lineTo(c.x1 - nx*wPx/2, c.y1 - ny*wPx/2);
+       ctx.closePath(); ctx.fill();
     });
 
-    // 4. COLUMNS & PADS (Top Layer)
     project.columns.forEach(col => {
         const [l1, l2] = col.intersectionId.split('-');
         const line1 = project.gridLines.find(l => l.label === l1);
         const line2 = project.gridLines.find(l => l.label === l2);
-        
         if (line1 && line2) {
              const x = mapX(line1.orientation === 'vertical' ? line1.position : line2.position);
              const y = mapY(line1.orientation === 'vertical' ? line2.position : line1.position);
-             
-             // Base Column Size
              const rawW = (col.width && col.width > 50) ? col.width : Math.max(300, wallWidth); 
              const rawH = (col.height && col.height > 50) ? col.height : Math.max(300, wallWidth);
-             const colW = mmToPx(rawW);
-             const colH = mmToPx(rawH);
+             const colW = mmToPx(rawW); const colH = mmToPx(rawH);
+             const padW = mmToPx(Math.max(footingWidth + workingSpace + 200, 1200));
 
-             // Pad Footing Size
-             const trenchRealW = footingWidth + workingSpace;
-             const padRealW = Math.max(trenchRealW + 200, 1200); 
-             const padW = mmToPx(padRealW);
-
-             // Draw Pad Footing
-             ctx.fillStyle = '#ffffff';
-             ctx.fillRect(x - padW/2, y - padW/2, padW, padW);
-             ctx.strokeStyle = '#000000'; 
-             ctx.lineWidth = P_035;
-             ctx.strokeRect(x - padW/2, y - padW/2, padW, padW);
-
-             // Draw Structural Column (Thick Outline/Solid)
-             ctx.fillStyle = '#000000';
-             ctx.fillRect(x - colW/2, y - colH/2, colW, colH);
+             ctx.fillStyle = '#ffffff'; ctx.fillRect(x - padW/2, y - padW/2, padW, padW);
+             ctx.strokeStyle = '#000000'; ctx.lineWidth = P_035; ctx.strokeRect(x - padW/2, y - padW/2, padW, padW);
+             ctx.fillStyle = '#000000'; ctx.fillRect(x - colW/2, y - colH/2, colW, colH);
         }
     });
 
-    // Grid System
     const ext = mmToPx(2000);
     ctx.setLineDash([mmToPx(800), mmToPx(150), mmToPx(100), mmToPx(150)]); 
-    ctx.strokeStyle = '#ef4444'; 
-    ctx.lineWidth = P_018; // Very thin
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = P_025;
     vLines.forEach(v => { const x = mapX(v.position); ctx.beginPath(); ctx.moveTo(x, cY - ext); ctx.lineTo(x, cY + mmToPx(gridH) + ext); ctx.stroke(); });
     hLines.forEach(h => { const y = mapY(h.position); ctx.beginPath(); ctx.moveTo(cX - ext, y); ctx.lineTo(cX + mmToPx(gridW) + ext, y); ctx.stroke(); });
     ctx.setLineDash([]);
 
-    // Grid Bubbles
     ctx.font = `bold ${T_BODY}px Inter`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     vLines.forEach(v => {
        const x = mapX(v.position); const y = cY - ext - BUBBLE_DIA/2;
@@ -321,11 +279,10 @@ function App() {
        ctx.fillStyle = '#000'; ctx.fillText(h.label, x, y);
     });
 
-    // Dimensions
     const drawDim = (x1: number, y1: number, x2: number, y2: number, txt: string, off: number, isV: boolean) => {
-       ctx.strokeStyle = '#000'; ctx.lineWidth = P_013; // Hairline dims
+       ctx.strokeStyle = '#000'; ctx.lineWidth = P_013;
        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-       const tick = mmToPx(150); ctx.lineWidth = P_025; // Thicker ticks
+       const tick = mmToPx(150); ctx.lineWidth = P_025;
        ctx.beginPath(); ctx.moveTo(x1-tick, y1+tick); ctx.lineTo(x1+tick, y1-tick); ctx.stroke();
        ctx.beginPath(); ctx.moveTo(x2-tick, y2+tick); ctx.lineTo(x2+tick, y2-tick); ctx.stroke();
        ctx.fillStyle = '#000'; ctx.font = `${T_BODY*0.9}px Inter`;
@@ -335,7 +292,6 @@ function App() {
     const t1Y = cY - ext - BUBBLE_DIA - 30*PPI;
     drawDim(mapX(vLines[0].position), t1Y, mapX(vLines[vLines.length-1].position), t1Y, gridW.toString(), t1Y, false);
     
-    // Title Block
     const tbW = 100 * PPI; const tbH = 45 * PPI;
     const tX = CANVAS_W - 10*PPI - tbW; const tY = CANVAS_H - 10*PPI - tbH;
     ctx.fillStyle = '#fff'; ctx.fillRect(tX, tY, tbW, tbH);
@@ -368,12 +324,38 @@ function App() {
                  <div className="flex items-center justify-between w-full max-w-5xl px-2">
                     <h2 className="text-xl font-bold text-blue-400">Structural Layout (Centered & Verified)</h2>
                     <div className="flex gap-2">
+                       <button onClick={() => setShowQR(!showQR)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2">
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4h2v-4zM5 21v-4H3v4h2zm6-4h2v4h-2v-4zM21 3h-6v6h6V3zM9 3H3v6h6V3zM9 15H3v6h6v-6z" /></svg>
+                         Mobile Access
+                       </button>
                        <a href={project.generatedImageSrc} download="foundation_pro.png" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium">Download PNG</a>
                        <button onClick={() => setStep(AppStep.COLUMN_SELECTION)} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-slate-200 text-sm">Edit</button>
                     </div>
                  </div>
-                 <div className="border border-slate-700 rounded overflow-hidden shadow-2xl flex-1 w-full max-w-5xl bg-slate-800 flex items-center justify-center p-4">
+                 
+                 <div className="relative border border-slate-700 rounded overflow-hidden shadow-2xl flex-1 w-full max-w-5xl bg-slate-800 flex items-center justify-center p-4 group">
                    <img src={project.generatedImageSrc} alt="Generated Plan" className="max-w-full max-h-full object-contain shadow-lg" style={{backgroundColor: 'white'}} />
+                   
+                   {/* QR Code Overlay */}
+                   {showQR && (
+                     <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10 animate-fade-in" onClick={() => setShowQR(false)}>
+                        <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center gap-4 animate-scale-in" onClick={e => e.stopPropagation()}>
+                           <h3 className="text-slate-900 font-bold text-lg">Scan to View on Site</h3>
+                           <div className="p-2 border-2 border-slate-100 rounded-lg">
+                             <QRCodeCanvas 
+                               value={`https://autofoundation.app/share/p/${project.gridLines.length}-${Date.now()}`} 
+                               size={200}
+                               level={"H"}
+                               includeMargin={true}
+                             />
+                           </div>
+                           <p className="text-slate-500 text-xs text-center max-w-[200px]">
+                             Scan this code with your tablet or phone to access the high-res plan immediately.
+                           </p>
+                           <button onClick={() => setShowQR(false)} className="text-slate-400 hover:text-slate-600 text-sm mt-2">Close</button>
+                        </div>
+                     </div>
+                   )}
                  </div>
                </div>
              ) : <div className="text-slate-400 animate-pulse">Calculating load paths and setting out...</div>}
