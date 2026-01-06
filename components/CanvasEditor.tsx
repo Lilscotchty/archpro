@@ -1,24 +1,23 @@
-import React, { useRef, useEffect, useState, MouseEvent, KeyboardEvent } from 'react';
-import { ProjectState, AppStep, GridLine, Column } from '../types';
+import React, { useRef, useEffect, useState, MouseEvent } from 'react';
+import { ProjectState, AppStep, GridLine } from '../types';
 
 interface CanvasEditorProps {
   step: AppStep;
   project: ProjectState;
   setProject: React.Dispatch<React.SetStateAction<ProjectState>>;
   currentTool: 'v-line' | 'h-line' | 'select' | null;
+  onCommitChange: () => void;
 }
 
-export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setProject, currentTool }) => {
+export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setProject, currentTool, onCommitChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number, y: number } | null>(null);
 
-  // Constants for rendering colors
-  const LINE_COLOR = '#3b82f6'; // Blue-500
-  const TEXT_COLOR = '#1e293b'; // Slate-800
-  const COL_COLOR = '#0f172a'; // Slate-900
+  const LINE_COLOR = '#3b82f6'; 
+  const TEXT_COLOR = '#1e293b'; 
+  const COL_COLOR = '#0f172a'; 
   
-  // Helper to get intersections
   const getIntersections = () => {
     const vLines = project.gridLines.filter(l => l.orientation === 'vertical');
     const hLines = project.gridLines.filter(l => l.orientation === 'horizontal');
@@ -59,41 +58,30 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
   const addGridLineAt = (x: number, y: number) => {
     if (step !== AppStep.GRID_MAPPING) return;
 
+    onCommitChange(); // Capture state before adding
+
     if (currentTool === 'v-line') {
-      // Small timeout to let the UI rendering finish before the alert freezes it
-      setTimeout(() => {
-        const defaultLabel = getNextLabel('vertical');
-        const label = prompt("Enter Grid Label (e.g., A, B, C):", defaultLabel);
-        if (label !== null) { 
-          const finalLabel = label.trim() || defaultLabel;
-          const newLine: GridLine = {
-            id: Math.random().toString(36).substr(2, 9),
-            label: finalLabel,
-            position: x,
-            orientation: 'vertical'
-          };
-          setProject(prev => ({ ...prev, gridLines: [...prev.gridLines, newLine] }));
-        }
-      }, 10);
+      const label = getNextLabel('vertical');
+      const newLine: GridLine = {
+        id: Math.random().toString(36).substr(2, 9),
+        label: label,
+        position: x,
+        orientation: 'vertical'
+      };
+      setProject(prev => ({ ...prev, gridLines: [...prev.gridLines, newLine] }));
+      
     } else if (currentTool === 'h-line') {
-      setTimeout(() => {
-        const defaultLabel = getNextLabel('horizontal');
-        const label = prompt("Enter Grid Label (e.g., 1, 2, 3):", defaultLabel);
-        if (label !== null) {
-          const finalLabel = label.trim() || defaultLabel;
-          const newLine: GridLine = {
-            id: Math.random().toString(36).substr(2, 9),
-            label: finalLabel,
-            position: y,
-            orientation: 'horizontal'
-          };
-          setProject(prev => ({ ...prev, gridLines: [...prev.gridLines, newLine] }));
-        }
-      }, 10);
+      const label = getNextLabel('horizontal');
+      const newLine: GridLine = {
+        id: Math.random().toString(36).substr(2, 9),
+        label: label,
+        position: y,
+        orientation: 'horizontal'
+      };
+      setProject(prev => ({ ...prev, gridLines: [...prev.gridLines, newLine] }));
     }
   };
 
-  // --- NEW: Handle Key Down directly on the container ---
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
       if (hoverPos) {
@@ -104,7 +92,44 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
     }
   };
 
-  // Draw loop
+  const handleCanvasClick = (e: MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+    
+    containerRef.current?.focus();
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scaleX = canvasRef.current.width / rect.width;
+    const scaleY = canvasRef.current.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    if (step === AppStep.GRID_MAPPING) {
+      addGridLineAt(x, y);
+    } else if (step === AppStep.COLUMN_SELECTION) {
+       const intersections = getIntersections();
+       const hitRadius = Math.max(15, project.imageWidth / 100);
+       const clicked = intersections.find(i => Math.hypot(i.x - x, i.y - y) < hitRadius);
+       
+       if (clicked) {
+         onCommitChange(); // Capture state before toggle
+         setProject(prev => {
+            const exists = prev.columns.find(c => c.intersectionId === clicked.id);
+            if (exists) {
+              return { ...prev, columns: prev.columns.filter(c => c.intersectionId !== clicked.id)};
+            } else {
+              return { 
+                ...prev, 
+                columns: [...prev.columns, { 
+                  intersectionId: clicked.id, 
+                  width: 20, height: 20, type: 'square' 
+                }]
+              };
+            }
+         });
+       }
+    }
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !project.imageSrc) return;
@@ -128,7 +153,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
       ctx.lineWidth = lineWidth;
       ctx.font = `bold ${fontSize}px Inter, sans-serif`;
 
-      // Draw Grid Lines
       project.gridLines.forEach(line => {
         ctx.beginPath();
         ctx.strokeStyle = LINE_COLOR;
@@ -161,7 +185,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
         ctx.setLineDash([]);
       });
 
-      // Draw Columns
       const intersections = getIntersections();
       const colSize = 20 * baseScale;
       const footingSize = 60 * baseScale;
@@ -180,7 +203,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
         }
       });
 
-      // Draw Tool Previews / Hover Effects
       if (hoverPos) {
         if (step === AppStep.GRID_MAPPING) {
           ctx.beginPath();
@@ -221,40 +243,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
     };
   }, [project, hoverPos, currentTool, step]);
 
-  const handleCanvasClick = (e: MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const scaleX = canvasRef.current.width / rect.width;
-    const scaleY = canvasRef.current.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-
-    if (step === AppStep.GRID_MAPPING) {
-      addGridLineAt(x, y);
-    } else if (step === AppStep.COLUMN_SELECTION) {
-       const intersections = getIntersections();
-       const hitRadius = Math.max(15, project.imageWidth / 100);
-       const clicked = intersections.find(i => Math.hypot(i.x - x, i.y - y) < hitRadius);
-       
-       if (clicked) {
-         setProject(prev => {
-            const exists = prev.columns.find(c => c.intersectionId === clicked.id);
-            if (exists) {
-              return { ...prev, columns: prev.columns.filter(c => c.intersectionId !== clicked.id)};
-            } else {
-              return { 
-                ...prev, 
-                columns: [...prev.columns, { 
-                  intersectionId: clicked.id, 
-                  width: 20, height: 20, type: 'square' 
-                }]
-              };
-            }
-         });
-       }
-    }
-  };
-
   const handleMouseMove = (e: MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -268,16 +256,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
   };
 
   const handleMouseEnter = () => {
-    // Auto-focus the div when mouse enters so keyboard works immediately
     containerRef.current?.focus();
   };
 
   return (
     <div 
       ref={containerRef} 
-      tabIndex={0} // Make div focusable
-      onKeyDown={handleKeyDown} // Listen for keys on this div
-      onMouseEnter={handleMouseEnter} // Focus when hovering
+      tabIndex={0} 
+      onKeyDown={handleKeyDown} 
+      onMouseEnter={handleMouseEnter} 
       className="relative w-full h-full overflow-auto bg-slate-900 flex justify-center items-center shadow-inner outline-none"
     >
       {project.imageSrc ? (

@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+
+import React, { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CanvasEditor } from './components/CanvasEditor';
 import { BackendPreview } from './components/BackendPreview';
-import { AppStep, ProjectState, GridLine, Column } from './types';
+import { AppStep, ProjectState, GridLine } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
+
+type HistoryState = Pick<ProjectState, 'gridLines' | 'columns'>;
 
 function App() {
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [currentTool, setCurrentTool] = useState<'v-line' | 'h-line' | 'select' | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
   const [project, setProject] = useState<ProjectState>({
     imageSrc: null,
     imageWidth: 0,
@@ -18,61 +22,74 @@ function App() {
     generatedImageSrc: null,
     settings: {
       scale: 100,
-      gridSpacing: 4000, // 4m default
-      wallWidth: 230,
-      trenchWidth: 600,
-      footingWidth: 1000
+      gridSpacing: 4000,
+      wallWidth: 225,      
+      trenchWidth: 600,    
+      footingWidth: 1000,
+      workingSpace: 300,
+      blindingOffset: 50
     }
   });
 
+  const [past, setPast] = useState<HistoryState[]>([]);
+  const [future, setFuture] = useState<HistoryState[]>([]);
+
+  const saveHistory = useCallback(() => {
+    const currentHistory: HistoryState = {
+      gridLines: project.gridLines,
+      columns: project.columns,
+    };
+    setPast(prev => [...prev.slice(-19), currentHistory]);
+    setFuture([]);
+  }, [project.gridLines, project.columns]);
+
+  const undo = useCallback(() => {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    const currentHistory: HistoryState = {
+      gridLines: project.gridLines,
+      columns: project.columns,
+    };
+    setPast(prev => prev.slice(0, prev.length - 1));
+    setFuture(prev => [currentHistory, ...prev]);
+    setProject(prev => ({ ...prev, gridLines: previous.gridLines, columns: previous.columns }));
+  }, [past, project.gridLines, project.columns]);
+
+  const redo = useCallback(() => {
+    if (future.length === 0) return;
+    const next = future[0];
+    const currentHistory: HistoryState = {
+      gridLines: project.gridLines,
+      columns: project.columns,
+    };
+    setFuture(prev => prev.slice(1));
+    setPast(prev => [...prev, currentHistory]);
+    setProject(prev => ({ ...prev, gridLines: next.gridLines, columns: next.columns }));
+  }, [future, project.gridLines, project.columns]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) redo(); else undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
   const handleAutoDetect = async () => {
     if (!project.imageSrc) return;
-    
     setIsAnalyzing(true);
     try {
-      // NOTE: In a production environment, this function would call the Python Cloud Function
-      // defined in constants.ts. That function uses OpenCV (HoughLinesP) and Google Cloud Vision
-      // to extract precise pixel coordinates and text labels.
-      
-      // For this client-side demo, we simulate this intelligent backend by using Gemini 
-      // with a highly specific prompt to approximate the structure.
-      
-      // Parse base64
       const [meta, data] = project.imageSrc.split(',');
       const mimeType = meta.split(':')[1].split(';')[0];
-      
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      // Improved prompt focusing on line geometry rather than just bubbles
-      const prompt = `
-        Analyze this architectural floor plan image to extract the structural grid system.
-        
-        The image contains grid lines marked by bubbles (circles) with text inside (A, B, C... or 1, 2, 3...).
-        
-        Your goal is to identify the location of the *lines* associated with these bubbles.
-        1. Find all vertical grid lines. Return their X-axis position (0.0 to 1.0).
-        2. Find all horizontal grid lines. Return their Y-axis position (0.0 to 1.0).
-        3. Extract the label inside the bubble (e.g. "A", "1").
-        
-        Be precise. The lines usually run through the center of the columns.
-        
-        Return a JSON object:
-        {
-          "gridLines": [
-            { "label": "A", "orientation": "vertical", "position": 0.15 },
-            ...
-          ]
-        }
-      `;
-
+      const prompt = `Analyze architectural plan to find structural grid system lines. Return JSON with 'gridLines' containing 'label', 'orientation' (vertical/horizontal), and normalized 'position' (0.0 to 1.0).`;
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: {
-          parts: [
-             { inlineData: { mimeType, data } },
-             { text: prompt }
-          ]
-        },
+        model: 'gemini-3-flash-preview',
+        contents: { parts: [{ inlineData: { mimeType, data } }, { text: prompt }] },
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
@@ -85,7 +102,7 @@ function App() {
                    properties: {
                      label: { type: Type.STRING },
                      orientation: { type: Type.STRING, enum: ['vertical', 'horizontal'] },
-                     position: { type: Type.NUMBER, description: "Normalized coordinate (0.0 to 1.0)" }
+                     position: { type: Type.NUMBER }
                    },
                    required: ['label', 'orientation', 'position']
                 }
@@ -94,408 +111,243 @@ function App() {
           }
         }
       });
-      
-      if (!response.text) {
-        throw new Error("No response from AI.");
-      }
-
-      // Robust JSON cleaning to prevent parsing errors
+      if (!response.text) throw new Error("No response from AI.");
       let jsonStr = response.text.trim();
-      if (jsonStr.startsWith('```')) {
-         jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/```$/, '');
-      }
-      
+      if (jsonStr.startsWith('```')) jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/```$/, '');
       const result = JSON.parse(jsonStr);
-      
-      if (result.gridLines && Array.isArray(result.gridLines) && result.gridLines.length > 0) {
+      if (result.gridLines) {
+         saveHistory();
          const newLines: GridLine[] = result.gridLines.map((l: any) => ({
            id: Math.random().toString(36).substr(2, 9),
            label: l.label,
            orientation: l.orientation,
-           position: l.orientation === 'vertical' 
-             ? l.position * project.imageWidth 
-             : l.position * project.imageHeight
+           position: l.orientation === 'vertical' ? l.position * project.imageWidth : l.position * project.imageHeight
          }));
-         
-         setProject(prev => ({
-           ...prev,
-           gridLines: newLines
-         }));
-      } else {
-        throw new Error("AI could not confidently identify grid lines.");
+         setProject(prev => ({ ...prev, gridLines: newLines }));
       }
-      
-    } catch (e) {
-      console.error(e);
-      let msg = "AI Detection failed.";
-      if (e instanceof Error) msg = e.message;
-      alert(`${msg}\n\nFalling back to manual mode. Please use the sidebar tools to draw grid lines over the existing plan labels.`);
-    } finally {
-      setIsAnalyzing(false);
-    }
+    } catch (e) { alert("Detection failed."); } finally { setIsAnalyzing(false); }
   };
 
   const handleGenerate = async () => {
     setStep(AppStep.GENERATION);
     
-    // A3 Dimensions in pixels (approx 200 DPI for screen viewing/download)
-    // A3 is 420mm x 297mm
-    const PPI = 8; // pixels per mm
-    const A3_WIDTH = 420 * PPI;
-    const A3_HEIGHT = 297 * PPI;
+    const PPI = 11.811; 
+    const PAPER_W = 420; // mm
+    const PAPER_H = 297; // mm
+    const CANVAS_W = PAPER_W * PPI;
+    const CANVAS_H = PAPER_H * PPI;
     
     const canvas = document.createElement('canvas');
-    canvas.width = A3_WIDTH;
-    canvas.height = A3_HEIGHT;
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // --- SETUP DRAWING ---
-    const { scale, gridSpacing, wallWidth, trenchWidth, footingWidth } = project.settings;
+    const { scale, gridSpacing, wallWidth, footingWidth, workingSpace, blindingOffset } = project.settings;
+
+    // ISO Pen Weights
+    const P_HAIR = 0.13 * PPI;
+    const P_THIN = 0.25 * PPI;
+    const P_MED = 0.35 * PPI;
+    const P_THICK = 0.5 * PPI;
+    const P_BORDER = 0.7 * PPI;
+    const T_BODY = 2.5 * PPI;
+    const T_HEAD = 5.0 * PPI;
+    const BUBBLE_DIA = 12 * PPI;
+
+    const mmToPx = (mm: number) => (mm / scale) * PPI;
+
+    const vLines = [...project.gridLines].filter(l => l.orientation === 'vertical').sort((a,b) => a.position - b.position);
+    const hLines = [...project.gridLines].filter(l => l.orientation === 'horizontal').sort((a,b) => a.position - b.position);
+
+    if (vLines.length < 1 || hLines.length < 1) return;
+
+    let pxPerRealMM = (vLines.length > 1) 
+      ? (vLines[vLines.length-1].position - vLines[0].position) / (gridSpacing * (vLines.length - 1))
+      : 0.1;
+
+    const gridW = vLines.length > 1 ? (gridSpacing * (vLines.length-1)) : 1000;
+    const gridH = hLines.length > 1 ? (gridSpacing * (hLines.length-1)) : 1000;
     
-    // Fill Paper
+    const cX = (CANVAS_W / 2) - (mmToPx(gridW) / 2);
+    const cY = (CANVAS_H / 2) - (mmToPx(gridH) / 2);
+
+    const mapX = (x: number) => cX + mmToPx((x - vLines[0].position) / pxPerRealMM);
+    const mapY = (y: number) => cY + mmToPx((y - hLines[0].position) / pxPerRealMM);
+
+    // Initial Background
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = P_BORDER;
+    ctx.strokeRect(10*PPI, 10*PPI, CANVAS_W - 20*PPI, CANVAS_H - 20*PPI);
 
-    // Coordinate System Logic
-    // 1. Calculate average pixel distance between grid lines in the source image
-    const vLines = project.gridLines.filter(l => l.orientation === 'vertical').sort((a,b) => a.position - b.position);
-    const hLines = project.gridLines.filter(l => l.orientation === 'horizontal').sort((a,b) => a.position - b.position);
-
-    let avgPixSpacing = 100; // fallback
-    if (vLines.length > 1) {
-      avgPixSpacing = (vLines[vLines.length-1].position - vLines[0].position) / (vLines.length - 1);
-    } else if (hLines.length > 1) {
-       avgPixSpacing = (hLines[hLines.length-1].position - hLines[0].position) / (hLines.length - 1);
-    }
-
-    // 2. Conversion Factor: Screen Pixels -> Real Millimeters
-    // "gridSpacing" is what the user says the distance between grids is (e.g. 4000mm)
-    const pxToRealMM = gridSpacing / avgPixSpacing;
-
-    // 3. Conversion Factor: Real Millimeters -> A3 Canvas Pixels
-    // Using User Scale (e.g., 1:100). 1mm on paper = 100mm real.
-    // So RealMM / Scale = PaperMM.
-    // PaperMM * PPI = CanvasPixels.
-    const realMMToCanvasPx = (mm: number) => (mm / scale) * PPI;
-
-    // Helper to map Source Image X/Y to A3 Canvas X/Y
-    // We center the grid on the A3 sheet
-    const sourceCenter = {
-       x: vLines.length > 0 ? (vLines[0].position + vLines[vLines.length-1].position)/2 : project.imageWidth/2,
-       y: hLines.length > 0 ? (hLines[0].position + hLines[hLines.length-1].position)/2 : project.imageHeight/2
-    };
-    
-    const canvasCenter = { x: A3_WIDTH / 2, y: A3_HEIGHT / 2 };
-
-    const mapX = (sourceX: number) => {
-       const distFromCenterPx = sourceX - sourceCenter.x;
-       const distRealMM = distFromCenterPx * pxToRealMM;
-       return canvasCenter.x + realMMToCanvasPx(distRealMM);
-    };
-
-    const mapY = (sourceY: number) => {
-       const distFromCenterPx = sourceY - sourceCenter.y;
-       const distRealMM = distFromCenterPx * pxToRealMM;
-       return canvasCenter.y + realMMToCanvasPx(distRealMM);
-    };
-
-    // --- DRAWING ---
-
-    // 1. Trenches & Walls (Auto-connect adjacent columns on same grid lines)
-    const trenchPx = realMMToCanvasPx(trenchWidth);
-    const wallPx = realMMToCanvasPx(wallWidth);
-    
-    // Identify connections
+    // Draw Elements
     const connections: {x1: number, y1: number, x2: number, y2: number}[] = [];
-    
-    // Check horizontal connections
-    hLines.forEach(h => {
-       // Find columns on this grid line
-       const colsOnLine = project.columns
-         .filter(c => c.intersectionId.endsWith(`-${h.label}`)) // Assumes ID format "V-H"
-         .map(c => {
-             const vLabel = c.intersectionId.split('-')[0];
-             const v = vLines.find(l => l.label === vLabel);
-             return v ? { col: c, pos: v.position } : null;
-         })
-         .filter(item => item !== null)
-         .sort((a, b) => a!.pos - b!.pos);
+    const findConnections = (lines: GridLine[], isVert: boolean) => {
+      lines.forEach(line => {
+        const cols = project.columns
+          .filter(c => c.intersectionId.includes(line.label))
+          .map(c => {
+             const parts = c.intersectionId.split('-');
+             const orthLabel = parts[0] === line.label ? parts[1] : parts[0];
+             const orthLine = (isVert ? hLines : vLines).find(l => l.label === orthLabel);
+             return orthLine ? { pos: orthLine.position } : null;
+          }).filter(x => x).sort((a,b) => a!.pos - b!.pos);
+        for(let i=0; i<cols.length-1; i++) {
+           if (isVert) connections.push({ x1: mapX(line.position), y1: mapY(cols[i]!.pos), x2: mapX(line.position), y2: mapY(cols[i+1]!.pos) });
+           else connections.push({ x1: mapX(cols[i]!.pos), y1: mapY(line.position), x2: mapX(cols[i+1]!.pos), y2: mapY(line.position) });
+        }
+      });
+    };
+    findConnections(hLines, false);
+    findConnections(vLines, true);
 
-       // Connect adjacent
-       for(let i=0; i < colsOnLine.length - 1; i++) {
-          connections.push({
-            x1: mapX(colsOnLine[i]!.pos),
-            y1: mapY(h.position),
-            x2: mapX(colsOnLine[i+1]!.pos),
-            y2: mapY(h.position)
-          });
-       }
-    });
+    const fPx = mmToPx(footingWidth);
+    const wPx = mmToPx(wallWidth);
+    const tPx = mmToPx(footingWidth + workingSpace);
+    const bPx = mmToPx(footingWidth + (blindingOffset * 2));
 
-    // Check vertical connections
-    vLines.forEach(v => {
-      const colsOnLine = project.columns
-        .filter(c => c.intersectionId.startsWith(`${v.label}-`))
-        .map(c => {
-            const hLabel = c.intersectionId.split('-')[1];
-            const h = hLines.find(l => l.label === hLabel);
-            return h ? { col: c, pos: h.position } : null;
-        })
-        .filter(item => item !== null)
-        .sort((a, b) => a!.pos - b!.pos);
-
-      for(let i=0; i < colsOnLine.length - 1; i++) {
-        connections.push({
-          x1: mapX(v.position),
-          y1: mapY(colsOnLine[i]!.pos),
-          x2: mapX(v.position),
-          y2: mapY(colsOnLine[i+1]!.pos)
-        });
-      }
-    });
-
-    // Draw Trenches (Bottom Layer)
-    ctx.strokeStyle = '#94a3b8'; // Light Slate
-    ctx.lineWidth = 1; 
-    ctx.setLineDash([10, 5]); // Dashed for excavation limits
     connections.forEach(c => {
-      // Draw parallel lines for trench width
-      const dx = c.x2 - c.x1;
-      const dy = c.y2 - c.y1;
-      const len = Math.sqrt(dx*dx + dy*dy);
-      const nx = -dy / len;
-      const ny = dx / len;
-      
-      const halfT = trenchPx / 2;
-      
-      ctx.beginPath();
-      ctx.moveTo(c.x1 + nx*halfT, c.y1 + ny*halfT);
-      ctx.lineTo(c.x2 + nx*halfT, c.y2 + ny*halfT);
-      ctx.stroke();
+       const dx = c.x2 - c.x1; const dy = c.y2 - c.y1; const len = Math.sqrt(dx*dx + dy*dy);
+       const nx = -dy/len; const ny = dx/len;
 
-      ctx.beginPath();
-      ctx.moveTo(c.x1 - nx*halfT, c.y1 - ny*halfT);
-      ctx.lineTo(c.x2 - nx*halfT, c.y2 - ny*halfT);
-      ctx.stroke();
+       // 1. Excavation Line (Dashed)
+       ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = P_HAIR; ctx.setLineDash([P_HAIR*8, P_HAIR*4]);
+       ctx.beginPath(); ctx.moveTo(c.x1 + nx*tPx/2, c.y1 + ny*tPx/2); ctx.lineTo(c.x2 + nx*tPx/2, c.y2 + ny*tPx/2); ctx.stroke();
+       ctx.beginPath(); ctx.moveTo(c.x1 - nx*tPx/2, c.y1 - ny*tPx/2); ctx.lineTo(c.x2 - nx*tPx/2, c.y2 - ny*tPx/2); ctx.stroke();
+
+       // 2. Blinding Layer (Thin Dashed)
+       ctx.strokeStyle = '#cbd5e1'; ctx.setLineDash([P_HAIR*4, P_HAIR*2]);
+       ctx.beginPath(); ctx.moveTo(c.x1 + nx*bPx/2, c.y1 + ny*bPx/2); ctx.lineTo(c.x2 + nx*bPx/2, c.y2 + ny*bPx/2); ctx.stroke();
+       ctx.beginPath(); ctx.moveTo(c.x1 - nx*bPx/2, c.y1 - ny*bPx/2); ctx.lineTo(c.x2 - nx*bPx/2, c.y2 - ny*bPx/2); ctx.stroke();
+       ctx.setLineDash([]);
+
+       // 3. Footing (Solid)
+       ctx.strokeStyle = '#000000'; ctx.lineWidth = P_MED;
+       ctx.beginPath(); ctx.moveTo(c.x1 + nx*fPx/2, c.y1 + ny*fPx/2); ctx.lineTo(c.x2 + nx*fPx/2, c.y2 + ny*fPx/2); ctx.stroke();
+       ctx.beginPath(); ctx.moveTo(c.x1 - nx*fPx/2, c.y1 - ny*fPx/2); ctx.lineTo(c.x2 - nx*fPx/2, c.y2 - ny*fPx/2); ctx.stroke();
+
+       // 4. Substructure Wall (Thick Solid)
+       ctx.lineWidth = P_THICK;
+       ctx.beginPath(); ctx.moveTo(c.x1 + nx*wPx/2, c.y1 + ny*wPx/2); ctx.lineTo(c.x2 + nx*wPx/2, c.y2 + ny*wPx/2); ctx.stroke();
+       ctx.beginPath(); ctx.moveTo(c.x1 - nx*wPx/2, c.y1 - ny*wPx/2); ctx.lineTo(c.x2 - nx*wPx/2, c.y2 - ny*wPx/2); ctx.stroke();
     });
+
+    // Grid lines with 2000mm extensions
+    const ext = mmToPx(2000);
+    ctx.setLineDash([20, 5, 2, 5]); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = P_HAIR;
+    vLines.forEach(v => { const x = mapX(v.position); ctx.beginPath(); ctx.moveTo(x, cY - ext); ctx.lineTo(x, cY + mmToPx(gridH) + ext); ctx.stroke(); });
+    hLines.forEach(h => { const y = mapY(h.position); ctx.beginPath(); ctx.moveTo(cX - ext, y); ctx.lineTo(cX + mmToPx(gridW) + ext, y); ctx.stroke(); });
     ctx.setLineDash([]);
 
-    // Draw Walls (Middle Layer)
-    ctx.strokeStyle = '#334155'; // Darker Slate
-    ctx.lineWidth = Math.max(1, wallPx); 
-    connections.forEach(c => {
-      ctx.beginPath();
-      ctx.moveTo(c.x1, c.y1);
-      ctx.lineTo(c.x2, c.y2);
-      ctx.stroke();
+    // Grid Bubbles
+    ctx.font = `bold ${T_BODY}px Inter`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    vLines.forEach(v => {
+       const x = mapX(v.position); const y = cY - ext - BUBBLE_DIA/2;
+       ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = P_THIN;
+       ctx.beginPath(); ctx.arc(x, y, BUBBLE_DIA/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+       ctx.fillStyle = '#000'; ctx.fillText(v.label, x, y);
+    });
+    hLines.forEach(h => {
+       const x = cX - ext - BUBBLE_DIA/2; const y = mapY(h.position);
+       ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = P_THIN;
+       ctx.beginPath(); ctx.arc(x, y, BUBBLE_DIA/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+       ctx.fillStyle = '#000'; ctx.fillText(h.label, x, y);
     });
 
-    // 2. Grid Lines
-    ctx.strokeStyle = '#ef4444'; // Red engineering lines
-    ctx.lineWidth = 1;
-    ctx.setLineDash([20, 10, 5, 10]); // Center line pattern
-    
-    // Draw Verticals extended
+    // 3-Tier Dimensioning
+    const drawDim = (x1: number, y1: number, x2: number, y2: number, txt: string, off: number, isV: boolean) => {
+       ctx.strokeStyle = '#000'; ctx.lineWidth = P_HAIR;
+       const dx = isV ? 0 : 0; const dy = isV ? 0 : 0;
+       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+       const tick = 2 * PPI; ctx.lineWidth = P_MED;
+       ctx.beginPath(); ctx.moveTo(x1-tick, y1+tick); ctx.lineTo(x1+tick, y1-tick); ctx.stroke();
+       ctx.beginPath(); ctx.moveTo(x2-tick, y2+tick); ctx.lineTo(x2+tick, y2-tick); ctx.stroke();
+       ctx.fillStyle = '#000'; ctx.font = `${T_BODY*0.9}px Inter`;
+       ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); if(isV) ctx.rotate(-Math.PI/2); ctx.fillText(txt, 0, -T_BODY); ctx.restore();
+    };
+
+    // V-Dimensions (Top)
+    const t3Y = cY - ext - BUBBLE_DIA - 10*PPI;
+    const t2Y = t3Y - 10*PPI;
+    const t1Y = t2Y - 10*PPI;
+
+    // Tier 1 (Overall)
+    drawDim(mapX(vLines[0].position), t1Y, mapX(vLines[vLines.length-1].position), t1Y, gridW.toString(), t1Y, false);
+    // Tier 2 (Spacing)
+    for(let i=0; i<vLines.length-1; i++) {
+       drawDim(mapX(vLines[i].position), t2Y, mapX(vLines[i+1].position), t2Y, gridSpacing.toString(), t2Y, false);
+    }
+    // Tier 3 (Detailed Setting Out)
     vLines.forEach(v => {
        const x = mapX(v.position);
-       ctx.beginPath();
-       ctx.moveTo(x, 50); // Margin
-       ctx.lineTo(x, A3_HEIGHT - 50);
-       ctx.stroke();
-       
-       // Bubble
-       ctx.save();
-       ctx.setLineDash([]);
-       ctx.fillStyle = '#ffffff';
-       ctx.strokeStyle = '#000000';
-       ctx.lineWidth = 2;
-       ctx.beginPath();
-       ctx.arc(x, 40, 20, 0, Math.PI*2);
-       ctx.fill();
-       ctx.stroke();
-       ctx.fillStyle = '#000000';
-       ctx.font = 'bold 24px sans-serif';
-       ctx.textAlign = 'center';
-       ctx.textBaseline = 'middle';
-       ctx.fillText(v.label, x, 40);
-       ctx.restore();
+       drawDim(x, t3Y, x + fPx/2, t3Y, (footingWidth/2).toString(), t3Y, false);
+       drawDim(x - wPx/2, t3Y + 4*PPI, x + wPx/2, t3Y + 4*PPI, wallWidth.toString(), t3Y, false);
     });
 
-    // Draw Horizontals extended
-    hLines.forEach(h => {
-       const y = mapY(h.position);
-       ctx.beginPath();
-       ctx.moveTo(50, y);
-       ctx.lineTo(A3_WIDTH - 50, y);
-       ctx.stroke();
+    // Title Block
+    const tbW = 100 * PPI; const tbH = 45 * PPI;
+    const tX = CANVAS_W - 10*PPI - tbW; const tY = CANVAS_H - 10*PPI - tbH;
+    ctx.fillStyle = '#fff'; ctx.fillRect(tX, tY, tbW, tbH);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = P_MED; ctx.strokeRect(tX, tY, tbW, tbH);
+    ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.font = `bold ${T_HEAD}px Inter`;
+    ctx.fillText("FOUNDATION LAYOUT PLAN", tX + 4*PPI, tY + 8*PPI);
+    ctx.font = `${T_BODY}px Inter`;
+    ctx.fillText(`PROJECT: SITE_AUTOGEN_S101`, tX + 4*PPI, tY + 18*PPI);
+    ctx.fillText(`SCALE: 1:${scale} @ A3`, tX + 4*PPI, tY + 24*PPI);
+    ctx.fillText(`DATE: ${new Date().toLocaleDateString()}`, tX + 4*PPI, tY + 30*PPI);
 
-       // Bubble
-       ctx.save();
-       ctx.setLineDash([]);
-       ctx.fillStyle = '#ffffff';
-       ctx.strokeStyle = '#000000';
-       ctx.lineWidth = 2;
-       ctx.beginPath();
-       ctx.arc(40, y, 20, 0, Math.PI*2);
-       ctx.fill();
-       ctx.stroke();
-       ctx.fillStyle = '#000000';
-       ctx.font = 'bold 24px sans-serif';
-       ctx.textAlign = 'center';
-       ctx.textBaseline = 'middle';
-       ctx.fillText(h.label, 40, y);
-       ctx.restore();
-    });
-    ctx.setLineDash([]);
-
-
-    // 3. Columns & Footings
-    const footingPx = realMMToCanvasPx(footingWidth);
-    const colPx = realMMToCanvasPx(400); // Standard 400mm column
-
-    project.columns.forEach(col => {
-       const parts = col.intersectionId.split('-');
-       const v = vLines.find(l => l.label === parts[0]);
-       const h = hLines.find(l => l.label === parts[1]);
-       
-       if (v && h) {
-          const cx = mapX(v.position);
-          const cy = mapY(h.position);
-
-          // Footing (Hidden Line style)
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([8, 8]);
-          ctx.strokeRect(cx - footingPx/2, cy - footingPx/2, footingPx, footingPx);
-          
-          // Column (Solid fill)
-          ctx.fillStyle = '#000000';
-          ctx.setLineDash([]);
-          ctx.fillRect(cx - colPx/2, cy - colPx/2, colPx, colPx);
-       }
-    });
-
-    // 4. Title Block
-    const TB_W = 600;
-    const TB_H = 200;
-    const TB_X = A3_WIDTH - TB_W - 20;
-    const TB_Y = A3_HEIGHT - TB_H - 20;
-    
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(TB_X, TB_Y, TB_W, TB_H);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(TB_X, TB_Y, TB_W, TB_H);
-    
-    // Lines inside title block
-    ctx.beginPath();
-    ctx.moveTo(TB_X + 200, TB_Y);
-    ctx.lineTo(TB_X + 200, TB_Y + TB_H);
-    ctx.stroke();
-
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 40px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText("AUTOFOUNDATION", TB_X + 100, TB_Y + TB_H/2);
-
-    ctx.textAlign = 'left';
-    ctx.font = '24px sans-serif';
-    ctx.fillText(`SHEET: FOUNDATION PLAN`, TB_X + 220, TB_Y + 40);
-    ctx.fillText(`SCALE: 1:${scale}`, TB_X + 220, TB_Y + 90);
-    ctx.fillText(`GRID SPACING: ${gridSpacing}mm`, TB_X + 220, TB_Y + 120);
-    ctx.fillText(`DATE: ${new Date().toLocaleDateString()}`, TB_X + 220, TB_Y + 160);
+    // Engineering Notes
+    const nX = 15*PPI; const nY = CANVAS_H - 45*PPI;
+    ctx.font = `bold ${T_BODY}px Inter`; ctx.fillText("GENERAL NOTES:", nX, nY);
+    ctx.font = `${T_BODY*0.8}px Inter`;
+    const notes = [
+      "1. CONCRETE GRADE: C25/30.",
+      "2. STEEL GRADE: HIGH YIELD DEFORMED BARS (460 N/mm²).",
+      "3. CONCRETE COVER: 50mm (EARTH CONTACT).",
+      "4. DPM: 1200 GAUGE POLYETHYLENE.",
+      `5. TRENCH WIDTH = FOOTING + ${workingSpace}mm WORKING SPACE.`
+    ];
+    notes.forEach((n, i) => ctx.fillText(n, nX, nY + (i+1)*4*PPI));
 
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      setProject(prev => ({ ...prev, generatedImageSrc: url }));
-    }
+    if (blob) setProject(prev => ({ ...prev, generatedImageSrc: URL.createObjectURL(blob) }));
   };
 
   return (
     <div className="flex h-screen w-screen bg-slate-900 text-slate-200 overflow-hidden font-sans">
-      
-      {/* Sidebar Controls */}
       <Sidebar 
-        step={step} 
-        setStep={setStep}
-        project={project} 
-        setProject={setProject}
-        currentTool={currentTool}
-        setCurrentTool={setCurrentTool}
-        onGenerate={handleGenerate}
-        onAutoDetect={handleAutoDetect}
-        isAnalyzing={isAnalyzing}
+        step={step} setStep={setStep} project={project} setProject={setProject}
+        currentTool={currentTool} setCurrentTool={setCurrentTool}
+        onGenerate={handleGenerate} onAutoDetect={handleAutoDetect}
+        isAnalyzing={isAnalyzing} onUndo={undo} onRedo={redo}
+        canUndo={past.length > 0} canRedo={future.length > 0}
       />
-
-      {/* Main Area */}
-      <main className="flex-1 relative">
+      <main className="flex-1 relative flex items-center justify-center overflow-hidden">
         {step === AppStep.GENERATION ? (
           <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-8">
              {project.generatedImageSrc ? (
-               <div className="flex flex-col items-center space-y-6 animate-fade-in w-full h-full">
-                 <div className="flex items-center justify-between w-full max-w-5xl">
-                    <h2 className="text-2xl font-bold text-green-400 flex items-center gap-2">
-                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                       A3 Plan Generated
-                    </h2>
-                    <div className="flex gap-3">
-                       <a 
-                          href={project.generatedImageSrc} 
-                          download="foundation_plan_a3.png"
-                          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded shadow-lg flex items-center gap-2 text-sm font-medium"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                          Download A3 PNG
-                        </a>
-                        <button 
-                          onClick={() => setStep(AppStep.COLUMN_SELECTION)}
-                          className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-slate-200 text-sm"
-                        >
-                          Edit Settings
-                        </button>
+               <div className="flex flex-col items-center space-y-4 animate-fade-in w-full h-full">
+                 <div className="flex items-center justify-between w-full max-w-5xl px-2">
+                    <h2 className="text-xl font-bold text-blue-400">Structural Layout (Centered & Verified)</h2>
+                    <div className="flex gap-2">
+                       <a href={project.generatedImageSrc} download="foundation_pro.png" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium">Download PNG</a>
+                       <button onClick={() => setStep(AppStep.COLUMN_SELECTION)} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-slate-200 text-sm">Edit</button>
                     </div>
                  </div>
-                 
-                 <div className="border-4 border-slate-800 rounded-lg overflow-hidden shadow-2xl flex-1 w-full max-w-5xl bg-slate-800">
-                   <img src={project.generatedImageSrc} alt="Generated Plan" className="w-full h-full object-contain bg-white" />
+                 <div className="border border-slate-700 rounded overflow-hidden shadow-2xl flex-1 w-full max-w-5xl bg-slate-800 flex items-center justify-center p-4">
+                   <img src={project.generatedImageSrc} alt="Generated Plan" className="max-w-full max-h-full object-contain shadow-lg" style={{backgroundColor: 'white'}} />
                  </div>
                </div>
-             ) : (
-               <div className="flex flex-col items-center text-slate-400">
-                  <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <p>Processing geometry and scaling to A3...</p>
-               </div>
-             )}
+             ) : <div className="text-slate-400 animate-pulse">Calculating load paths and setting out...</div>}
           </div>
         ) : (
-          <CanvasEditor 
-            step={step} 
-            project={project} 
-            setProject={setProject} 
-            currentTool={currentTool} 
-          />
+          <CanvasEditor step={step} project={project} setProject={setProject} currentTool={currentTool} onCommitChange={saveHistory} />
         )}
-        
-        {/* Helper Overlay */}
-        <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur border border-slate-700 p-3 rounded text-xs text-slate-400 max-w-xs shadow-xl pointer-events-none">
-           <p className="font-bold text-slate-200 mb-1">Current Status:</p>
-           {step === AppStep.UPLOAD && "Upload a floor plan image to begin."}
-           {step === AppStep.GRID_MAPPING && (isAnalyzing ? "Analyzing grid structure..." : "Use AI Auto-Detect or manually place grid lines.")}
-           {step === AppStep.COLUMN_SELECTION && "Configure dimensions in sidebar, then select columns on the plan."}
-           {step === AppStep.GENERATION && "Rendering high-resolution A3 plan..."}
-        </div>
       </main>
-
-      {/* Code Modal */}
-      {step === AppStep.BACKEND_SPECS && (
-        <BackendPreview onClose={() => setStep(AppStep.GRID_MAPPING)} />
-      )}
-
+      {step === AppStep.BACKEND_SPECS && <BackendPreview onClose={() => setStep(AppStep.GRID_MAPPING)} />}
     </div>
   );
 }
-
 export default App;

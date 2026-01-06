@@ -1,3 +1,4 @@
+
 export enum AppStep {
   UPLOAD = 'UPLOAD',
   GRID_MAPPING = 'GRID_MAPPING',
@@ -11,31 +12,25 @@ export type GridOrientation = 'vertical' | 'horizontal';
 export interface GridLine {
   id: string;
   label: string;
-  position: number; // Pixel coordinate (X for vertical, Y for horizontal)
+  position: number; // Pixel coordinate
   orientation: GridOrientation;
-}
-
-export interface Intersection {
-  id: string;
-  x: number;
-  y: number;
-  vLabel: string;
-  hLabel: string;
 }
 
 export interface Column {
   intersectionId: string;
   type: 'square' | 'rectangular';
-  width: number; // in pixels (mock scale)
+  width: number; // in mm
   height: number;
 }
 
 export interface ProjectSettings {
-  scale: number; // 1:X (e.g., 100)
-  gridSpacing: number; // Real world mm between grids (approx)
+  scale: number; // 1:X
+  gridSpacing: number; // mm
   wallWidth: number; // mm
   trenchWidth: number; // mm
   footingWidth: number; // mm
+  workingSpace: number; // mm (default 300)
+  blindingOffset: number; // mm (default 50)
 }
 
 export interface ProjectState {
