@@ -5,6 +5,13 @@ import { BackendPreview } from './components/BackendPreview';
 import { AppStep, ProjectState, GridLine } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { QRCodeCanvas } from 'qrcode.react';
+import { createClient } from '@supabase/supabase-js';
+
+// --- CONFIGURATION ---
+// Replace these with your actual Supabase credentials
+const supabaseUrl = 'YOUR_SUPABASE_URL'; 
+const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 type HistoryState = Pick<ProjectState, 'gridLines' | 'columns'>;
 
@@ -12,7 +19,8 @@ function App() {
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [currentTool, setCurrentTool] = useState<'v-line' | 'h-line' | 'select' | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showQR, setShowQR] = useState(false); // New state for QR Modal
+  const [isUploading, setIsUploading] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   
   const [project, setProject] = useState<ProjectState>({
     imageSrc: null,
@@ -131,6 +139,7 @@ function App() {
 
   const handleGenerate = async () => {
     setStep(AppStep.GENERATION);
+    setIsUploading(true);
     
     // --- CANVAS CONFIGURATION ---
     const PPI = 300 / 25.4; 
@@ -303,8 +312,29 @@ function App() {
     ctx.fillText(`SCALE: 1:${scale} @ A3`, tX + 4*PPI, tY + 24*PPI);
     ctx.fillText(`DATE: ${new Date().toLocaleDateString()}`, tX + 4*PPI, tY + 30*PPI);
 
+    // 1. Convert Canvas to Blob
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-    if (blob) setProject(prev => ({ ...prev, generatedImageSrc: URL.createObjectURL(blob) }));
+    if (!blob) { setIsUploading(false); return; }
+
+    // 2. Upload to Supabase Storage
+    const fileName = `foundation_${Date.now()}.png`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('plans')
+      .upload(fileName, blob, { contentType: 'image/png' });
+
+    if (uploadError) {
+      console.error('Upload Error:', uploadError);
+      alert('Failed to upload plan to cloud.');
+      setIsUploading(false);
+      return;
+    }
+
+    // 3. Get Public URL (Direct Image Link)
+    const { data: { publicUrl } } = supabase.storage.from('plans').getPublicUrl(fileName);
+
+    // 4. Update State with Remote URL
+    setProject(prev => ({ ...prev, generatedImageSrc: publicUrl }));
+    setIsUploading(false);
   };
 
   return (
@@ -312,7 +342,7 @@ function App() {
       <Sidebar 
         step={step} setStep={setStep} project={project} setProject={setProject}
         currentTool={currentTool} setCurrentTool={setCurrentTool}
-        onGenerate={handleGenerate} onAutoDetect={handleAutoDetect}
+        onGenerate={handleGenerate} onAutoDetect={handleAutoDetect} 
         isAnalyzing={isAnalyzing} onUndo={undo} onRedo={redo}
         canUndo={past.length > 0} canRedo={future.length > 0}
       />
@@ -322,11 +352,11 @@ function App() {
              {project.generatedImageSrc ? (
                <div className="flex flex-col items-center space-y-4 animate-fade-in w-full h-full">
                  <div className="flex items-center justify-between w-full max-w-5xl px-2">
-                    <h2 className="text-xl font-bold text-blue-400">Structural Layout (Centered & Verified)</h2>
+                    <h2 className="text-xl font-bold text-blue-400">Structural Layout</h2>
                     <div className="flex gap-2">
                        <button onClick={() => setShowQR(!showQR)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2">
-                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4h2v-4zM5 21v-4H3v4h2zm6-4h2v4h-2v-4zM21 3h-6v6h6V3zM9 3H3v6h6V3zM9 15H3v6h6v-6z" /></svg>
-                         Mobile Access
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4h2v-4zM5 21v-4H3v4h2zm6-4h2v4h-2v-4z" /></svg>
+                         {isUploading ? "Uploading..." : "Mobile Access"}
                        </button>
                        <a href={project.generatedImageSrc} download="foundation_pro.png" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium">Download PNG</a>
                        <button onClick={() => setStep(AppStep.COLUMN_SELECTION)} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-slate-200 text-sm">Edit</button>
@@ -337,20 +367,15 @@ function App() {
                    <img src={project.generatedImageSrc} alt="Generated Plan" className="max-w-full max-h-full object-contain shadow-lg" style={{backgroundColor: 'white'}} />
                    
                    {/* QR Code Overlay */}
-                   {showQR && (
+                   {showQR && project.generatedImageSrc && (
                      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10 animate-fade-in" onClick={() => setShowQR(false)}>
                         <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center gap-4 animate-scale-in" onClick={e => e.stopPropagation()}>
-                           <h3 className="text-slate-900 font-bold text-lg">Scan to View on Site</h3>
+                           <h3 className="text-slate-900 font-bold text-lg">Scan to View Plan</h3>
                            <div className="p-2 border-2 border-slate-100 rounded-lg">
-                             <QRCodeCanvas 
-                               value={`https://archpro.vercel.app//share/p/${project.gridLines.length}-${Date.now()}`} 
-                               size={200}
-                               level={"H"}
-                               includeMargin={true}
-                             />
+                             <QRCodeCanvas value={project.generatedImageSrc} size={200} level={"H"} includeMargin={true} />
                            </div>
                            <p className="text-slate-500 text-xs text-center max-w-[200px]">
-                             Scan this code with your tablet or phone to access the high-res plan immediately.
+                             This QR Code opens the <b>image file directly</b>.<br/>Works on any device.
                            </p>
                            <button onClick={() => setShowQR(false)} className="text-slate-400 hover:text-slate-600 text-sm mt-2">Close</button>
                         </div>
@@ -358,7 +383,7 @@ function App() {
                    )}
                  </div>
                </div>
-             ) : <div className="text-slate-400 animate-pulse">Calculating load paths and setting out...</div>}
+             ) : <div className="text-slate-400 animate-pulse">{isUploading ? "Uploading to Cloud..." : "Calculating..."}</div>}
           </div>
         ) : (
           <CanvasEditor step={step} project={project} setProject={setProject} currentTool={currentTool} onCommitChange={saveHistory} />
