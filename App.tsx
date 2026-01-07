@@ -343,7 +343,7 @@ function App() {
                            <h3 className="text-slate-900 font-bold text-lg">Scan to View on Site</h3>
                            <div className="p-2 border-2 border-slate-100 rounded-lg">
                              <QRCodeCanvas 
-                               value={`https://autofoundation.app/share/p/${project.gridLines.length}-${Date.now()}`} 
+                               value={`https://archpro.vercel.app//share/p/${project.gridLines.length}-${Date.now()}`} 
                                size={200}
                                level={"H"}
                                includeMargin={true}
