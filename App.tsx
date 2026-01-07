@@ -9,8 +9,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // --- CONFIGURATION ---
 // Replace these with your actual Supabase credentials
-const supabaseUrl = 'YOUR_SUPABASE_URL'; 
-const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+const supabaseUrl = 'https://gsmobkuznwnspjhpxtbh.supabase.co'; 
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzbW9ia3V6bnduc3BqaHB4dGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3Mjk2MjYsImV4cCI6MjA4MzMwNTYyNn0.tF5vPvorfg171RoJVJFVeGR-lqFD1Q8DNHHHWcLO_WA';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 type HistoryState = Pick<ProjectState, 'gridLines' | 'columns'>;
