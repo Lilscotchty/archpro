@@ -65,18 +65,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
           <button
             key={mod.id}
             onClick={() => onSelectModule(mod.id)}
-            className="glass-panel group rounded-3xl p-8 text-left relative overflow-hidden"
+            /* UPDATED CLASS NAMES:
+              - Removed generic hover styles from glass-panel
+              - Added specific 'hover:scale-[1.01]' and 'hover:bg-white/10' here
+              - Removed rainbow borders
+            */
+            className="glass-panel group rounded-3xl p-8 text-left relative overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:bg-white/10 hover:shadow-2xl"
             style={{ animationDelay: `${idx * 150}ms` }}
           >
-            {/* INNER GLOW */}
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${mod.gradient} opacity-20 blur-2xl group-hover:opacity-40 transition-opacity duration-500 rounded-full -mr-10 -mt-10`}></div>
+            {/* INNER GLOW (Cleaned up) */}
+            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${mod.gradient} opacity-20 blur-2xl group-hover:opacity-30 transition-opacity duration-500 rounded-full -mr-10 -mt-10`}></div>
             
             <div className="flex items-start gap-6 relative z-10">
-              <div className={`p-4 rounded-2xl bg-gradient-to-br ${mod.gradient} text-white shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}>
+              <div className={`p-4 rounded-2xl bg-gradient-to-br ${mod.gradient} text-white shadow-lg group-hover:scale-105 transition-transform duration-500`}>
                 {mod.icon}
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-300 transition-colors">
+                <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-blue-200 transition-colors">
                   {mod.title}
                 </h3>
                 <p className="text-slate-400 text-sm leading-relaxed font-medium group-hover:text-slate-200 transition-colors">
@@ -94,7 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
       </div>
       
       <div className="mt-20 text-slate-500/50 text-xs font-mono tracking-widest uppercase">
-        v2.5.0 Liquid / Engine Ready
+        v2.6.0 Stable / SMM7 Engine
       </div>
     </div>
   );
