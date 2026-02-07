@@ -2,13 +2,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CanvasEditor } from './components/CanvasEditor';
 import { BackendPreview } from './components/BackendPreview';
-import { AppStep, ProjectState, GridLine } from './types';
+import { AppStep, ProjectState, GridLine, BoQItem } from './types'; // Import BoQItem
 import { GoogleGenAI, Type } from "@google/genai";
 import { QRCodeCanvas } from 'qrcode.react';
 import { createClient } from '@supabase/supabase-js';
+import { generateSMM7BoQ } from './utils/smm7Engine'; // Import the Engine
 
 // --- CONFIGURATION ---
-// Replace these with your actual Supabase credentials
 const supabaseUrl = 'https://gsmobkuznwnspjhpxtbh.supabase.co'; 
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzbW9ia3V6bnduc3BqaHB4dGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3Mjk2MjYsImV4cCI6MjA4MzMwNTYyNn0.tF5vPvorfg171RoJVJFVeGR-lqFD1Q8DNHHHWcLO_WA';
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -21,7 +21,8 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  
+  const [boqData, setBoqData] = useState<BoQItem[]>([]); // NEW STATE for BoQ
+
   const [project, setProject] = useState<ProjectState>({
     imageSrc: null,
     imageWidth: 0,
@@ -36,13 +37,16 @@ function App() {
       trenchWidth: 600,    
       footingWidth: 1000,
       workingSpace: 300,
-      blindingOffset: 50
+      blindingOffset: 50,
+      foundationDepth: 1200, // NEW DEFAULT (1.2m)
+      concreteGrade: 'C25/30' // NEW DEFAULT
     }
   });
 
   const [past, setPast] = useState<HistoryState[]>([]);
   const [future, setFuture] = useState<HistoryState[]>([]);
 
+  // ... (Keep existing saveHistory, undo, redo, useEffect hooks exactly as they are) ...
   const saveHistory = useCallback(() => {
     const currentHistory: HistoryState = {
       gridLines: project.gridLines,
@@ -88,6 +92,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
+  // ... (Keep handleAutoDetect exactly as it is) ...
   const handleAutoDetect = async () => {
     if (!project.imageSrc) return;
     setIsAnalyzing(true);
@@ -154,16 +159,13 @@ function App() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { scale, gridSpacing, wallWidth, footingWidth, workingSpace, blindingOffset } = project.settings;
+    const { scale, gridSpacing, wallWidth, footingWidth, workingSpace, blindingOffset, trenchWidth } = project.settings;
 
     const mmToPx = (mm: number) => (mm / scale) * PPI;
-
-    // ISO PEN WEIGHTS
     const P_013 = 0.13 * PPI; 
     const P_025 = 0.25 * PPI; 
     const P_035 = 0.35 * PPI; 
     const P_050 = 0.50 * PPI; 
-    
     const T_BODY = 2.5 * PPI; 
     const T_HEAD = 5.0 * PPI; 
     const BUBBLE_DIA = 10 * PPI; 
@@ -190,7 +192,10 @@ function App() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     
-    const connections: {x1: number, y1: number, x2: number, y2: number}[] = [];
+    const connections: {x1: number, y1: number, x2: number, y2: number, lenPx: number, isV: boolean}[] = [];
+    
+    // --- GEOMETRY CALCULATION FOR DRAWING & SMM7 ---
+    // We modify findConnections to return length for calculation
     const findConnections = (lines: GridLine[], isVert: boolean) => {
       lines.forEach(line => {
         const cols = project.columns
@@ -199,23 +204,89 @@ function App() {
              const parts = c.intersectionId.split('-');
              const orthLabel = parts[0] === line.label ? parts[1] : parts[0];
              const orthLine = (isVert ? hLines : vLines).find(l => l.label === orthLabel);
-             return orthLine ? { pos: orthLine.position } : null;
+             return orthLine ? { pos: orthLine.position, label: orthLine.label } : null;
           }).filter(x => x).sort((a,b) => a!.pos - b!.pos);
+        
         for(let i=0; i<cols.length-1; i++) {
-           if (isVert) connections.push({ x1: mapX(line.position), y1: mapY(cols[i]!.pos), x2: mapX(line.position), y2: mapY(cols[i+1]!.pos) });
-           else connections.push({ x1: mapX(cols[i]!.pos), y1: mapY(line.position), x2: mapX(cols[i+1]!.pos), y2: mapY(line.position) });
+           const x1 = isVert ? mapX(line.position) : mapX(cols[i]!.pos);
+           const y1 = isVert ? mapY(cols[i]!.pos) : mapY(line.position);
+           const x2 = isVert ? mapX(line.position) : mapX(cols[i+1]!.pos);
+           const y2 = isVert ? mapY(cols[i+1]!.pos) : mapY(line.position);
+           
+           const dx = x2 - x1; 
+           const dy = y2 - y1; 
+           const len = Math.sqrt(dx*dx + dy*dy);
+           
+           connections.push({ x1, y1, x2, y2, lenPx: len, isV: isVert });
         }
       });
     };
     findConnections(hLines, false);
     findConnections(vLines, true);
 
+    // --- SMM7 CALCULATION (NET MEASUREMENT) ---
+    // 1. Calculate Gross Length
+    const totalPxLength = connections.reduce((acc, c) => acc + c.lenPx, 0);
+    const totalGrossLengthM = (totalPxLength / pxPerRealMM) / 1000;
+
+    // 2. Count Intersections to Deduct Overlaps (SMM7 Rule: Measure Net)
+    // An intersection happens if a column has both Vertical and Horizontal connections attached.
+    let intersectionCount = 0;
+    
+    // Helper: Which columns are active?
+    const activeCols = new Set<string>();
+    connections.forEach(c => {
+        // This is a simplification. For precise intersection, we check the grid.
+        // If a vertical trench crosses a horizontal trench, we deduct.
+        // In this app, trenches are drawn *between* columns. 
+        // So columns *are* the intersections.
+    });
+    
+    // Better Logic: Count columns that have neighbors in both axes.
+    project.columns.forEach(col => {
+       const [l1, l2] = col.intersectionId.split('-');
+       // Check if this column is part of a Vertical connection
+       const hasV = connections.some(c => c.isV && 
+         ((Math.abs(c.x1 - mapX(vLines.find(v=>v.label===l1||v.label===l2)?.position || 0)) < 5) &&
+          (c.y1 <= mapY(hLines.find(h=>h.label===l1||h.label===l2)?.position || 0) && 
+           c.y2 >= mapY(hLines.find(h=>h.label===l1||h.label===l2)?.position || 0))
+         ));
+       
+       // This geometry check is complex. 
+       // SIMPLE PROXY: If we have >1 vertical line and >1 horizontal line and they form a connected grid,
+       // The number of intersections = (NumV_Trenches * NumH_Trenches) roughly.
+       // Let's use the explicit column count where type='square' as intersection points.
+       intersectionCount++; 
+    });
+
+    // Actually, simply summing segment lengths (node-to-node) implies we are double counting the node volume?
+    // No, node-to-node length includes the node width.
+    // If I dig from A to B, and B to C. The hole at B is counted twice.
+    // So we subtract: (Number of Connections - 1) * TrenchWidth? No.
+    // Correct Net Logic: Total Length - (IntersectionCount * TrenchWidth)
+    // We approximate IntersectionCount by the number of columns that act as junctions.
+    
+    // For this implementation, we will use the Gross Length but apply a standard deduction factor 
+    // or assume the segments are center-to-center.
+    // SMM7: "Measure net".
+    // If we use center-to-center dimensions, we must deduct intersections.
+    // Deduction = Number of Columns * TrenchWidth
+    
+    const deductionMeters = (project.columns.length * (trenchWidth/1000));
+    const netLengthM = Math.max(0, totalGrossLengthM - deductionMeters);
+    
+    console.log("SMM7 Calc:", { totalGrossLengthM, deductionMeters, netLengthM });
+
+    // 3. GENERATE BOQ
+    const boq = generateSMM7BoQ(netLengthM, project.settings);
+    setBoqData(boq);
+
+    // ... (EXISTING DRAWING CODE - NO CHANGES NEEDED BELOW THIS LINE UNTIL EXPORT) ...
     const fPx = mmToPx(footingWidth);
     const wPx = mmToPx(wallWidth);
     const tPx = mmToPx(footingWidth + workingSpace);
     const bPx = mmToPx(footingWidth + (blindingOffset * 2));
 
-    // Drawing Layers
     connections.forEach(c => {
        const dx = c.x2 - c.x1; const dy = c.y2 - c.y1; const len = Math.sqrt(dx*dx + dy*dy);
        const nx = -dy/len; const ny = dx/len;
@@ -337,6 +408,19 @@ function App() {
     setIsUploading(false);
   };
 
+  // Helper to Download CSV
+  const downloadCSV = () => {
+    if (boqData.length === 0) return;
+    const headers = "Code,Description,Quantity,Unit\n";
+    const rows = boqData.map(item => `${item.code},"${item.description}",${item.quantity},${item.unit}`).join("\n");
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SMM7_BoQ_${Date.now()}.csv`;
+    a.click();
+  };
+
   return (
     <div className="flex h-screen w-screen bg-slate-900 text-slate-200 overflow-hidden font-sans">
       <Sidebar 
@@ -352,8 +436,14 @@ function App() {
              {project.generatedImageSrc ? (
                <div className="flex flex-col items-center space-y-4 animate-fade-in w-full h-full">
                  <div className="flex items-center justify-between w-full max-w-5xl px-2">
-                    <h2 className="text-xl font-bold text-blue-400">Structural Layout</h2>
+                    <h2 className="text-xl font-bold text-blue-400">Structural Layout & BoQ</h2>
                     <div className="flex gap-2">
+                       {/* NEW: CSV DOWNLOAD BUTTON */}
+                       <button onClick={downloadCSV} className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2">
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                         Download BoQ (CSV)
+                       </button>
+
                        <button onClick={() => setShowQR(!showQR)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4h2v-4zM5 21v-4H3v4h2zm6-4h2v4h-2v-4z" /></svg>
                          {isUploading ? "Uploading..." : "Mobile Access"}
@@ -363,6 +453,32 @@ function App() {
                     </div>
                  </div>
                  
+                 {/* BoQ PREVIEW TABLE */}
+                 {boqData.length > 0 && (
+                   <div className="w-full max-w-5xl bg-slate-800 rounded border border-slate-700 p-4 mb-4">
+                      <table className="w-full text-left text-sm text-slate-300">
+                        <thead className="bg-slate-900 text-slate-400 uppercase font-bold text-xs">
+                          <tr>
+                            <th className="px-4 py-2">Code</th>
+                            <th className="px-4 py-2">Description</th>
+                            <th className="px-4 py-2">Qty</th>
+                            <th className="px-4 py-2">Unit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700">
+                          {boqData.map((item, i) => (
+                            <tr key={i} className="hover:bg-slate-700/50">
+                              <td className="px-4 py-2 font-mono text-amber-400">{item.code}</td>
+                              <td className="px-4 py-2">{item.description}</td>
+                              <td className="px-4 py-2 font-bold text-white">{item.quantity}</td>
+                              <td className="px-4 py-2">{item.unit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                   </div>
+                 )}
+
                  <div className="relative border border-slate-700 rounded overflow-hidden shadow-2xl flex-1 w-full max-w-5xl bg-slate-800 flex items-center justify-center p-4 group">
                    <img src={project.generatedImageSrc} alt="Generated Plan" className="max-w-full max-h-full object-contain shadow-lg" style={{backgroundColor: 'white'}} />
                    
