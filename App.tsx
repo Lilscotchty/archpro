@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CanvasEditor } from './components/CanvasEditor';
 import { Dashboard } from './components/Dashboard';
@@ -35,16 +35,6 @@ const GlobalStyles = () => (
       border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
     }
-    
-    .text-shine {
-      background: linear-gradient(to right, #94a3b8 20%, #ffffff 50%, #94a3b8 80%);
-      background-size: 200% auto;
-      color: transparent;
-      background-clip: text;
-      -webkit-background-clip: text;
-      animation: shine 4s linear infinite;
-    }
-    @keyframes shine { to { background-position: 200% center; } }
 
     /* Zoom Controls */
     .zoom-controls {
@@ -100,9 +90,9 @@ function App() {
     settings: {
       scale: 100,
       gridSpacing: 4000,
-      wallWidth: 225,       
-      trenchWidth: 450,     
-      footingWidth: 1000,   
+      wallWidth: 225,       // BLOCK WIDTH (INNER)
+      trenchWidth: 450,     // TRENCH WIDTH (OUTER)
+      footingWidth: 1000,   // COLUMN BASE (PAD)
       workingSpace: 300,
       blindingOffset: 50,
       foundationDepth: 1200, 
@@ -138,7 +128,7 @@ function App() {
   // --- ZOOM HANDLERS ---
   const handleWheel = (e: React.WheelEvent) => {
     if (step === AppStep.GENERATION) {
-      e.preventDefault(); // Stop page scroll
+      e.preventDefault(); 
       const delta = e.deltaY * -0.001;
       const newScale = Math.min(Math.max(0.5, scale + delta), 4);
       setScale(newScale);
@@ -159,11 +149,7 @@ function App() {
   };
 
   const stopDrag = () => setIsDragging(false);
-
-  const resetZoom = () => {
-    setScale(1);
-    setPan({ x: 0, y: 0 });
-  };
+  const resetZoom = () => { setScale(1); setPan({ x: 0, y: 0 }); };
 
   // AI AUTO-DETECT
   const handleAutoDetect = async () => {
@@ -182,7 +168,7 @@ function App() {
     } catch (e) { setIsAnalyzing(false); }
   };
 
-  // GENERATION LOGIC
+  // --- GENERATION LOGIC (UPDATED FOR TECHNICAL DRAWING STYLE) ---
   const handleGenerate = async () => {
     setStep(AppStep.GENERATION);
     setIsUploading(true);
@@ -197,9 +183,14 @@ function App() {
 
     const { scale, gridSpacing, wallWidth, footingWidth, trenchWidth } = project.settings;
     const mmToPx = (mm: number) => (mm / scale) * PPI;
-    const P_THIN = 0.13 * PPI; 
-    const P_THICK = 0.35 * PPI; 
+    
+    // LINE WEIGHTS
+    const P_THIN = 0.25;  // Thin line for Blockwork/Inner
+    const P_THICK = 2.5;  // Thick line for Trench/Outer/Pad
+    const P_GRID = 0.5;   // Very thin for Grid
+    
     const T_HEAD = 5.0 * PPI; 
+    const BUBBLE_R = 30; // Radius for grid bubbles
 
     const vLines = [...project.gridLines].filter(l => l.orientation === 'vertical').sort((a,b) => a.position - b.position);
     const hLines = [...project.gridLines].filter(l => l.orientation === 'horizontal').sort((a,b) => a.position - b.position);
@@ -218,11 +209,54 @@ function App() {
     const mapX = (x: number) => cX + mmToPx((x - vLines[0].position) / pxPerRealMM);
     const mapY = (y: number) => cY + mmToPx((y - hLines[0].position) / pxPerRealMM);
 
+    // 1. CLEAR CANVAS
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    const connections: {x1: number, y1: number, x2: number, y2: number, lenPx: number}[] = [];
+    // 2. DRAW GRID LINES (CENTER LINES) - BEHIND EVERYTHING
+    ctx.strokeStyle = '#ef4444'; // Red or Thin Black
+    ctx.lineWidth = P_GRID;
+    ctx.setLineDash([20, 10, 5, 10]); // DASH-DOT-DASH Pattern
     
+    // Draw Vertical Grid
+    vLines.forEach((l, i) => {
+        const x = mapX(l.position);
+        ctx.beginPath();
+        ctx.moveTo(x, cY - 50);
+        ctx.lineTo(x, cY + mmToPx(gridH) + 50);
+        ctx.stroke();
+        
+        // Bubble Top
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(x, cY - 80, BUBBLE_R, 0, Math.PI*2); 
+        ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px Arial';
+        ctx.fillText((i+1).toString(), x, cY - 80);
+        ctx.setLineDash([20, 10, 5, 10]);
+    });
+
+    // Draw Horizontal Grid
+    hLines.forEach((l, i) => {
+        const y = mapY(l.position);
+        ctx.beginPath();
+        ctx.moveTo(cX - 50, y);
+        ctx.lineTo(cX + mmToPx(gridW) + 50, y);
+        ctx.stroke();
+
+        // Bubble Left
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(cX - 80, y, BUBBLE_R, 0, Math.PI*2);
+        ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px Arial';
+        const label = String.fromCharCode(65 + i); // A, B, C...
+        ctx.fillText(label, cX - 80, y);
+        ctx.setLineDash([20, 10, 5, 10]);
+    });
+
+    ctx.setLineDash([]); // Reset dash
+
+    // --- GEOMETRY CALCULATION ---
+    const connections: {x1: number, y1: number, x2: number, y2: number, lenPx: number}[] = [];
     const findConnections = (lines: any[], isVert: boolean) => {
       lines.forEach(line => {
         const cols = project.columns
@@ -247,28 +281,37 @@ function App() {
     findConnections(hLines, false);
     findConnections(vLines, true);
 
+    // Calculate SMM7 Net Length
     const totalPxLength = connections.reduce((acc, c) => acc + c.lenPx, 0);
     const totalMeters = (totalPxLength / pxPerRealMM) / 1000;
     const deduction = (project.columns.length * (trenchWidth/1000));
     const netMeters = Math.max(0, totalMeters - deduction);
-    
     setProject(prev => ({ ...prev, calculatedTrenchLength: netMeters }));
 
-    // 1. TRENCHES
+    // 3. DRAW TRENCHES (OUTER LINES) - THICK
     const tPx = mmToPx(trenchWidth); 
-    ctx.fillStyle = '#f1f5f9'; ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = P_THIN;
+    ctx.strokeStyle = '#000000'; 
+    ctx.lineWidth = P_THICK; 
+    ctx.lineJoin = 'miter';
+
     connections.forEach(c => {
        const dx = c.x2 - c.x1; const dy = c.y2 - c.y1; const len = Math.sqrt(dx*dx + dy*dy);
        const nx = -dy/len; const ny = dx/len;
+       
+       ctx.fillStyle = '#ffffff'; // Fill white to hide grid lines under trench
        ctx.beginPath();
-       ctx.moveTo(c.x1 + nx*tPx/2, c.y1 + ny*tPx/2); ctx.lineTo(c.x2 + nx*tPx/2, c.y2 + ny*tPx/2);
-       ctx.lineTo(c.x2 - nx*tPx/2, c.y2 - ny*tPx/2); ctx.lineTo(c.x1 - nx*tPx/2, c.y1 - ny*tPx/2);
-       ctx.closePath(); ctx.fill(); ctx.stroke();
+       ctx.moveTo(c.x1 + nx*tPx/2, c.y1 + ny*tPx/2); 
+       ctx.lineTo(c.x2 + nx*tPx/2, c.y2 + ny*tPx/2);
+       ctx.lineTo(c.x2 - nx*tPx/2, c.y2 - ny*tPx/2); 
+       ctx.lineTo(c.x1 - nx*tPx/2, c.y1 - ny*tPx/2);
+       ctx.closePath(); 
+       ctx.fill(); 
+       ctx.stroke(); // THICK STROKE
     });
 
-    // 2. PAD FOOTINGS
+    // 4. DRAW PAD FOOTINGS - THICK
     const fPx = mmToPx(footingWidth); 
-    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#000000'; ctx.lineWidth = P_THICK;
+    ctx.fillStyle = '#ffffff';
     project.columns.forEach(col => {
         const [l1, l2] = col.intersectionId.split('-');
         const line1 = project.gridLines.find(l => l.label === l1);
@@ -281,18 +324,29 @@ function App() {
         }
     });
 
-    // 3. WALLS
-    const wPx = mmToPx(wallWidth); ctx.fillStyle = '#64748b'; 
+    // 5. DRAW WALLS (INNER LINES) - THIN & HOLLOW
+    const wPx = mmToPx(wallWidth); 
+    ctx.lineWidth = P_THIN; 
+    
     connections.forEach(c => {
        const dx = c.x2 - c.x1; const dy = c.y2 - c.y1; const len = Math.sqrt(dx*dx + dy*dy);
        const nx = -dy/len; const ny = dx/len;
+       
+       // Fill white first to hide trench lines inside the wall (clean intersection)
+       ctx.fillStyle = '#ffffff'; 
        ctx.beginPath();
-       ctx.moveTo(c.x1 + nx*wPx/2, c.y1 + ny*wPx/2); ctx.lineTo(c.x2 + nx*wPx/2, c.y2 + ny*wPx/2);
-       ctx.lineTo(c.x2 - nx*wPx/2, c.y2 - ny*wPx/2); ctx.lineTo(c.x1 - nx*wPx/2, c.y1 - ny*wPx/2);
-       ctx.closePath(); ctx.fill();
+       ctx.moveTo(c.x1 + nx*wPx/2, c.y1 + ny*wPx/2); 
+       ctx.lineTo(c.x2 + nx*wPx/2, c.y2 + ny*wPx/2);
+       ctx.lineTo(c.x2 - nx*wPx/2, c.y2 - ny*wPx/2); 
+       ctx.lineTo(c.x1 - nx*wPx/2, c.y1 - ny*wPx/2);
+       ctx.closePath(); 
+       ctx.fill();
+       ctx.stroke(); // THIN STROKE
     });
 
-    // 4. COLUMNS
+    // 6. DRAW COLUMN STUBS - SOLID FILL
+    const colStubPx = mmToPx(225); // Standard column size
+    ctx.fillStyle = '#000000';
     project.columns.forEach(col => {
         const [l1, l2] = col.intersectionId.split('-');
         const line1 = project.gridLines.find(l => l.label === l1);
@@ -300,16 +354,27 @@ function App() {
         if (line1 && line2) {
              const x = mapX(line1.orientation === 'vertical' ? line1.position : line2.position);
              const y = mapY(line1.orientation === 'vertical' ? line2.position : line1.position);
-             ctx.fillStyle = '#000000'; ctx.fillRect(x - wPx/2, y - wPx/2, wPx, wPx);
+             ctx.fillRect(x - colStubPx/2, y - colStubPx/2, colStubPx, colStubPx);
         }
     });
 
-    // Title Block
+    // 7. TITLE BLOCK & LABELS
     const tbW = 100 * PPI; const tbH = 45 * PPI;
     const tX = CANVAS_W - 10*PPI - tbW; const tY = CANVAS_H - 10*PPI - tbH;
-    ctx.strokeStyle = '#000'; ctx.lineWidth = P_THICK; ctx.strokeRect(tX, tY, tbW, tbH);
-    ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.font = `bold ${T_HEAD}px Inter`;
-    ctx.fillText("FOUNDATION LAYOUT", tX + 4*PPI, tY + 8*PPI);
+    
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(tX, tY, tbW, tbH);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; 
+    ctx.strokeRect(tX, tY, tbW, tbH);
+    
+    ctx.fillStyle = '#000'; 
+    ctx.textAlign = 'left'; 
+    ctx.font = 'bold 36px Arial';
+    ctx.fillText("FOUNDATION PLAN", tX + 20, tY + 50);
+    
+    ctx.font = '24px Arial';
+    ctx.fillText("PROJECT: STEPHANE RESIDENCE", tX + 20, tY + 90);
+    ctx.fillText(`SCALE 1:${scale}`, tX + 20, tY + 120);
+    ctx.fillText(`DATE: ${new Date().toLocaleDateString()}`, tX + 20, tY + 150);
 
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
     if (!blob) { setIsUploading(false); return; }
@@ -376,14 +441,12 @@ function App() {
                                 />
                               </div>
                               
-                              {/* FLOATING ZOOM CONTROLS */}
                               <div className="zoom-controls">
                                 <button className="zoom-btn" onClick={() => setScale(s => Math.min(s + 0.5, 4))} title="Zoom In">+</button>
                                 <button className="zoom-btn" onClick={() => setScale(s => Math.max(s - 0.5, 0.5))} title="Zoom Out">-</button>
                                 <button className="zoom-btn" onClick={resetZoom} title="Reset View">⟲</button>
                               </div>
 
-                              {/* QR CODE OVERLAY */}
                               {showQR && (
                                 <div className="absolute inset-0 bg-white/95 z-20 flex flex-col items-center justify-center animate-fade-in cursor-default" onClick={(e) => { e.stopPropagation(); setShowQR(false); }}>
                                    <QRCodeCanvas value={project.generatedImageSrc} size={250} />
@@ -393,7 +456,6 @@ function App() {
                               )}
                            </div>
                            
-                           {/* ACTION BUTTONS */}
                            <div className="flex items-center justify-between w-full gap-4">
                               <div className="flex gap-2">
                                 <a href={project.generatedImageSrc} download="foundation_plan.png" className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2">
@@ -411,7 +473,6 @@ function App() {
                               </button>
                            </div>
 
-                           {/* SMM7 SUGGESTION */}
                            <div className="w-full mt-6 pt-6 border-t border-white/10 flex justify-end">
                               <button 
                                 onClick={() => setActiveModule(AppModule.MEASUREMENT)} 
