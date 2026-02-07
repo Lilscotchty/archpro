@@ -1,3 +1,4 @@
+// types.ts
 
 export enum AppStep {
   UPLOAD = 'UPLOAD',
@@ -31,6 +32,9 @@ export interface ProjectSettings {
   footingWidth: number; // mm
   workingSpace: number; // mm (default 300)
   blindingOffset: number; // mm (default 50)
+  // NEW SMM7 FIELDS
+  foundationDepth: number; // mm (default 1000)
+  concreteGrade: string;   // e.g. 'C20/25'
 }
 
 export interface ProjectState {
@@ -48,4 +52,12 @@ export interface BackendSpecData {
   language: string;
   code: string;
   description: string;
+}
+
+// NEW INTERFACE FOR SMM7
+export interface BoQItem {
+  code: string;       // e.g., "D20.2.1"
+  description: string;
+  quantity: number;
+  unit: string;       // "m3", "m2", "m", "nr"
 }
