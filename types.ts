@@ -1,5 +1,13 @@
 // types.ts
 
+export enum AppModule {
+  DASHBOARD = 'DASHBOARD',
+  DRAWINGS = 'DRAWINGS',
+  MEASUREMENT = 'MEASUREMENT',
+  METHOD_STUDY = 'METHOD_STUDY',
+  PHYSICS = 'PHYSICS'
+}
+
 export enum AppStep {
   UPLOAD = 'UPLOAD',
   GRID_MAPPING = 'GRID_MAPPING',
@@ -13,28 +21,28 @@ export type GridOrientation = 'vertical' | 'horizontal';
 export interface GridLine {
   id: string;
   label: string;
-  position: number; // Pixel coordinate
+  position: number; 
   orientation: GridOrientation;
 }
 
 export interface Column {
   intersectionId: string;
   type: 'square' | 'rectangular';
-  width: number; // in mm
+  width: number; 
   height: number;
 }
 
 export interface ProjectSettings {
-  scale: number; // 1:X
-  gridSpacing: number; // mm
-  wallWidth: number; // mm
-  trenchWidth: number; // mm
-  footingWidth: number; // mm
-  workingSpace: number; // mm (default 300)
-  blindingOffset: number; // mm (default 50)
-  // NEW SMM7 FIELDS
-  foundationDepth: number; // mm (default 1000)
-  concreteGrade: string;   // e.g. 'C20/25'
+  scale: number; 
+  gridSpacing: number; 
+  wallWidth: number; 
+  trenchWidth: number; 
+  footingWidth: number; 
+  workingSpace: number; 
+  blindingOffset: number; 
+  // Global Engineering Settings
+  foundationDepth: number; // in mm
+  concreteGrade: string;
 }
 
 export interface ProjectState {
@@ -45,6 +53,15 @@ export interface ProjectState {
   columns: Column[];
   settings: ProjectSettings;
   generatedImageSrc: string | null;
+  // Shared Data Bridge
+  calculatedTrenchLength?: number; // stored in meters
+}
+
+export interface BoQItem {
+  code: string;
+  description: string;
+  quantity: number;
+  unit: string;
 }
 
 export interface BackendSpecData {
@@ -52,12 +69,4 @@ export interface BackendSpecData {
   language: string;
   code: string;
   description: string;
-}
-
-// NEW INTERFACE FOR SMM7
-export interface BoQItem {
-  code: string;       // e.g., "D20.2.1"
-  description: string;
-  quantity: number;
-  unit: string;       // "m3", "m2", "m", "nr"
 }
