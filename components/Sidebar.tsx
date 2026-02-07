@@ -25,7 +25,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   return (
     <aside className="w-80 h-full p-4 flex flex-col z-20 relative">
-      {/* FLOATING GLASS CONTAINER */}
+      {/* Static Glass Panel: 
+         Uses the .glass-panel class from App.tsx which now has NO hover effects or rainbow borders.
+      */}
       <div className="glass-panel w-full h-full rounded-2xl flex flex-col overflow-hidden shadow-2xl">
         
         {/* HEADER */}
