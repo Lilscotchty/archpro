@@ -2,11 +2,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { MeasurementModule } from './components/MeasurementModule';
 import { AppStep, ProjectState, AppModule, ArchElement, GridLine } from './types';
-import { generateElevation } from './utils/elevation';
+import { generateElevation } from './utils/elevationEngine';
 
 type Tool = 'select' | 'pan' | 'grid' | 'wall' | 'rect' | 'door' | 'window';
 type Pt = { x: number; y: number };
 type View = { x: number; y: number; z: number };
+type NewEl = { type: string; x1: number; y1: number; x2: number; y2: number };
 
 const C = {
   bg: '#15171a', panel: '#1f2227', rule: '#2e333a', text: '#c9cfd6', dim: '#7d8590',
@@ -29,9 +30,6 @@ const ICONS: Record<string, string> = {
   trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
   upload: 'M12 16V4m0 0l-4 4m4-4l4 4M4 20h16',
 };
-const Icon = ({ n, s = 18 }: { n: string; s?: number }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS[n]} /></svg>
-);
 
 const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'select', label: 'Select', key: 'V' }, { id: 'pan', label: 'Pan', key: 'H' },
@@ -46,6 +44,7 @@ function segDist(p: Pt, a: Pt, b: Pt) {
   const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
   return dist(p, { x: a.x + t * dx, y: a.y + t * dy });
 }
+const kindOf = (e: ArchElement): string => e.type as string;
 
 const initialProject = (): ProjectState => ({
   imageSrc: null, imageWidth: 0, imageHeight: 0, gridLines: [], elements: [], columns: [],
@@ -53,6 +52,24 @@ const initialProject = (): ProjectState => ({
   specs: { floors: 1, floorHeight: 3000, plinthHeight: 450, roof: { type: 'gable', pitch: 30, overhang: 600 } },
   generatedImageSrc: null, calculatedTrenchLength: 0,
 } as any);
+
+// ---------- small UI pieces (kept outside App so inputs don't remount and lose focus) ----------
+const Icon = ({ n, s = 18 }: { n: string; s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS[n]} /></svg>
+);
+const Btn = ({ on, onClick, title, children }: { on?: boolean; onClick: () => void; title: string; children: React.ReactNode }) => (
+  <button title={title} onClick={onClick} style={{ background: on ? C.accent : 'transparent', color: on ? '#06121f' : C.text }}
+    className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1">{children}</button>
+);
+const Num = ({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) => (
+  <label className="flex items-center justify-between gap-2 py-1 text-xs" style={{ color: C.dim }}>
+    {label}
+    <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} style={{ background: C.bg, borderColor: C.rule, color: C.text, fontFamily: MONO }} className="w-20 px-1.5 py-1 border rounded-[3px] text-right" />
+  </label>
+);
+const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div style={{ borderColor: C.rule }} className="border-b px-3 py-2.5"><div className="text-xs font-semibold mb-1.5" style={{ color: C.text }}>{title}</div>{children}</div>
+);
 
 export default function App() {
   const [activeModule, setActiveModule] = useState<AppModule>(AppModule.DASHBOARD);
@@ -85,8 +102,8 @@ export default function App() {
     setProject(p => { history.current.push(p); if (history.current.length > 60) history.current.shift(); return fn(p); });
   }, []);
   const undo = useCallback(() => { const p = history.current.pop(); if (p) { setProject(p); setSel(null); } }, []);
-  const addEl = (el: Omit<ArchElement, 'id' | 'gridRef'>) =>
-    commit(p => ({ ...p, elements: [...p.elements, { ...el, id: crypto.randomUUID(), gridRef: '' } as ArchElement] }));
+  const addEl = (el: NewEl) =>
+    commit(p => ({ ...p, elements: [...p.elements, { ...el, id: crypto.randomUUID(), gridRef: '' } as unknown as ArchElement] }));
   const deleteSel = useCallback(() => {
     if (!sel) return;
     commit(p => ({ ...p, elements: p.elements.filter(e => e.id !== sel), gridLines: p.gridLines.filter(g => g.id !== sel) }));
@@ -102,15 +119,19 @@ export default function App() {
   }, [project.imageWidth, project.imageHeight, size]);
 
   const snapPoint = (raw: Pt, from: Pt | null): Pt => {
-    let p = raw;
+    let p: Pt = raw;
     if (snapOn) {
-      const r = 14 / view.z; let best: Pt | null = null; let bd = r;
+      const r = 14 / view.z;
       const pts: Pt[] = project.elements.flatMap(e => [{ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }]);
-      pts.forEach(q => { const d = dist(raw, q); if (d < bd) { bd = d; best = q; } });
-      p = best || { x: Math.round(raw.x / 50) * 50, y: Math.round(raw.y / 50) * 50 };
+      const near = pts.reduce<{ q: Pt | null; d: number }>((acc, q) => {
+        const d = dist(raw, q);
+        return d < acc.d ? { q, d } : acc;
+      }, { q: null, d: r });
+      p = near.q ?? { x: Math.round(raw.x / 50) * 50, y: Math.round(raw.y / 50) * 50 };
     }
     if (ortho && from) {
-      Math.abs(p.x - from.x) > Math.abs(p.y - from.y) ? (p = { x: p.x, y: from.y }) : (p = { x: from.x, y: p.y });
+      if (Math.abs(p.x - from.x) > Math.abs(p.y - from.y)) p = { x: p.x, y: from.y };
+      else p = { x: from.x, y: p.y };
     }
     return p;
   };
@@ -134,9 +155,10 @@ export default function App() {
   // ---------- drawing ----------
   useEffect(() => {
     const c = canvasRef.current; if (!c || !drafting) return;
+    const ctx = c.getContext('2d'); if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
     c.width = size.w * dpr; c.height = size.h * dpr;
-    const ctx = c.getContext('2d')!; const z = view.z;
+    const z = view.z;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, size.w, size.h);
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * view.x, dpr * view.y);
@@ -148,15 +170,15 @@ export default function App() {
     if (layers.underlay && imgRef.current) { ctx.globalAlpha = 0.45; ctx.drawImage(imgRef.current, 0, 0, W, H); ctx.globalAlpha = 1; }
 
     // adaptive drafting grid
-    let step = 100; while (step * z < 14) step *= 5;
+    let gs = 100; while (gs * z < 14) gs *= 5;
     ctx.lineWidth = lw(1);
-    for (let x = 0; x <= W; x += step) { ctx.strokeStyle = x % (step * 5) === 0 ? '#2b3037' : '#22262b'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y <= H; y += step) { ctx.strokeStyle = y % (step * 5) === 0 ? '#2b3037' : '#22262b'; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    for (let x = 0; x <= W; x += gs) { ctx.strokeStyle = x % (gs * 5) === 0 ? '#2b3037' : '#22262b'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += gs) { ctx.strokeStyle = y % (gs * 5) === 0 ? '#2b3037' : '#22262b'; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
     ctx.strokeStyle = C.rule; ctx.lineWidth = lw(1.5); ctx.strokeRect(0, 0, W, H);
 
     // structural grid lines
     if (layers.grid) {
-      ctx.strokeStyle = C.grid; ctx.lineWidth = lw(1); ctx.setLineDash([lw(14), lw(4), lw(2), lw(4)]);
+      ctx.lineWidth = lw(1); ctx.setLineDash([lw(14), lw(4), lw(2), lw(4)]);
       project.gridLines.forEach(g => {
         ctx.strokeStyle = g.id === sel ? C.accent : C.grid;
         ctx.beginPath();
@@ -169,7 +191,8 @@ export default function App() {
     ctx.font = `${lw(11)}px ${MONO}`; ctx.textBaseline = 'middle';
     project.elements.forEach(e => {
       const on = e.id === sel;
-      if (e.type === 'wall' && layers.walls) {
+      const kind = kindOf(e);
+      if (kind === 'wall' && layers.walls) {
         const a = Math.atan2(e.y2 - e.y1, e.x2 - e.x1), t = project.settings.wallWidth / 2;
         const nx = -Math.sin(a) * t, ny = Math.cos(a) * t;
         ctx.beginPath(); ctx.moveTo(e.x1 + nx, e.y1 + ny); ctx.lineTo(e.x2 + nx, e.y2 + ny); ctx.lineTo(e.x2 - nx, e.y2 - ny); ctx.lineTo(e.x1 - nx, e.y1 - ny); ctx.closePath();
@@ -177,18 +200,18 @@ export default function App() {
         ctx.strokeStyle = on ? C.accent : C.wall; ctx.lineWidth = lw(1.4); ctx.stroke();
         if (on) {
           ctx.fillStyle = C.accent;
-          [[e.x1, e.y1], [e.x2, e.y2]].forEach(([x, y]) => ctx.fillRect(x - lw(4), y - lw(4), lw(8), lw(8)));
+          ([[e.x1, e.y1], [e.x2, e.y2]] as [number, number][]).forEach(([x, y]) => ctx.fillRect(x - lw(4), y - lw(4), lw(8), lw(8)));
           ctx.fillStyle = C.text; ctx.fillText(`${Math.round(dist({ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }))}`, (e.x1 + e.x2) / 2 + lw(8), (e.y1 + e.y2) / 2 - lw(10));
         }
-      } else if (e.type === 'opening' as any && layers.walls) {
+      } else if (kind === 'opening' && layers.walls) {
         ctx.strokeStyle = C.wall; ctx.lineWidth = lw(1.4);
         const w = e.x2 - e.x1, h = e.y2 - e.y1; ctx.fillStyle = 'rgba(232,234,237,.06)'; ctx.fillRect(e.x1, e.y1, w, h); ctx.strokeRect(e.x1, e.y1, w, h);
-      } else if (e.type === 'door' && layers.openings) {
+      } else if (kind === 'door' && layers.openings) {
         const w = Math.abs(e.x2 - e.x1) || DOOR_W;
         ctx.strokeStyle = on ? C.accent : C.door; ctx.lineWidth = lw(1.4);
         ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x1, e.y1 - w); ctx.stroke();
         ctx.beginPath(); ctx.arc(e.x1, e.y1, w, -Math.PI / 2, 0); ctx.stroke();
-      } else if (e.type === 'window' && layers.openings) {
+      } else if (kind === 'window' && layers.openings) {
         const w = Math.abs(e.x2 - e.x1) || WIN_W, t = project.settings.wallWidth;
         ctx.strokeStyle = on ? C.accent : C.win; ctx.lineWidth = lw(1.4);
         ctx.strokeRect(e.x1, e.y1 - t / 2, w, t);
@@ -207,7 +230,7 @@ export default function App() {
     }
 
     // crosshair + snap marker
-    if (drafting && tool !== 'pan' && tool !== 'select') {
+    if (tool !== 'pan' && tool !== 'select') {
       ctx.strokeStyle = 'rgba(201,207,214,.35)'; ctx.lineWidth = lw(1);
       ctx.beginPath(); ctx.moveTo(cursor.x - lw(14), cursor.y); ctx.lineTo(cursor.x + lw(14), cursor.y); ctx.moveTo(cursor.x, cursor.y - lw(14)); ctx.lineTo(cursor.x, cursor.y + lw(14)); ctx.stroke();
       if (snapOn) { ctx.strokeStyle = C.door; ctx.strokeRect(cursor.x - lw(5), cursor.y - lw(5), lw(10), lw(10)); }
@@ -215,7 +238,7 @@ export default function App() {
   }, [project, view, size, layers, sel, start, mouse, tool, snapOn, ortho, drafting]); // eslint-disable-line
 
   // ---------- input ----------
-  const local = (e: React.PointerEvent | WheelEvent) => {
+  const local = (e: { clientX: number; clientY: number }): Pt => {
     const r = canvasRef.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   useEffect(() => {
@@ -228,37 +251,48 @@ export default function App() {
     return () => c.removeEventListener('wheel', onWheel);
   }, [drafting]);
 
-  const onDown = (e: React.PointerEvent) => {
-    const s = local(e);
-    if (e.button === 1 || tool === 'pan' || spaceDown.current) { panning.current = { sx: s.x, sy: s.y, vx: view.x, vy: view.y }; (e.target as Element).setPointerCapture(e.pointerId); return; }
-    if (e.button !== 0) return;
-    const p = snapPoint(toWorld(s.x, s.y), start);
-    if (tool === 'select') {
-      const r = 8 / view.z; let hit: string | null = null;
-      project.elements.forEach(el => {
-        if (el.type === 'wall' ? segDist(p, { x: el.x1, y: el.y1 }, { x: el.x2, y: el.y2 }) < Math.max(r, project.settings.wallWidth / 2) : dist(p, { x: el.x1, y: el.y1 }) < Math.max(r, 500)) hit = el.id;
-      });
-      project.gridLines.forEach(g => { if (Math.abs((g.orientation === 'vertical' ? p.x : p.y) - g.position) < r) hit = g.id; });
-      setSel(hit); return;
-    }
-    if (tool === 'door') return addEl({ type: 'door', x1: p.x, y1: p.y, x2: p.x + DOOR_W, y2: p.y });
-    if (tool === 'window') return addEl({ type: 'window', x1: p.x, y1: p.y, x2: p.x + WIN_W, y2: p.y });
-    if (!start) { setStart(p); return; }
-    finish(p);
-  };
   const finish = (p: Pt) => {
     if (!start) return;
     if (tool === 'wall') addEl({ type: 'wall', x1: start.x, y1: start.y, x2: p.x, y2: p.y });
-    else if (tool === 'rect') addEl({ type: 'opening' as any, x1: start.x, y1: start.y, x2: p.x, y2: p.y });
+    else if (tool === 'rect') addEl({ type: 'opening', x1: start.x, y1: start.y, x2: p.x, y2: p.y });
     else if (tool === 'grid') {
       const v = Math.abs(p.x - start.x) < Math.abs(p.y - start.y);
       const n = project.gridLines.filter(g => g.orientation === (v ? 'vertical' : 'horizontal')).length;
-      const g: GridLine = { id: crypto.randomUUID(), label: v ? String(n + 1) : String.fromCharCode(65 + (n % 26)), orientation: v ? 'vertical' : 'horizontal', position: v ? start.x : start.y };
+      const g = { id: crypto.randomUUID(), label: v ? String(n + 1) : String.fromCharCode(65 + (n % 26)), orientation: v ? 'vertical' : 'horizontal', position: v ? start.x : start.y } as unknown as GridLine;
       commit(pr => ({ ...pr, gridLines: [...pr.gridLines, g] }));
     }
     setStart(tool === 'wall' ? p : null); // walls chain like a polyline
   };
-  const onMove = (e: React.PointerEvent) => {
+
+  const onDown = (e: React.PointerEvent<HTMLCanvasElement>): void => {
+    const s = local(e);
+    if (e.button === 1 || tool === 'pan' || spaceDown.current) {
+      panning.current = { sx: s.x, sy: s.y, vx: view.x, vy: view.y };
+      (e.target as Element).setPointerCapture(e.pointerId);
+      return;
+    }
+    if (e.button !== 0) return;
+    const p = snapPoint(toWorld(s.x, s.y), start);
+    if (tool === 'select') {
+      const r = 8 / view.z; let hit: string | null = null;
+      for (const el of project.elements) {
+        const near = kindOf(el) === 'wall'
+          ? segDist(p, { x: el.x1, y: el.y1 }, { x: el.x2, y: el.y2 }) < Math.max(r, project.settings.wallWidth / 2)
+          : dist(p, { x: el.x1, y: el.y1 }) < Math.max(r, 500);
+        if (near) hit = el.id;
+      }
+      for (const g of project.gridLines) {
+        if (Math.abs((g.orientation === 'vertical' ? p.x : p.y) - g.position) < r) hit = g.id;
+      }
+      setSel(hit);
+      return;
+    }
+    if (tool === 'door') { addEl({ type: 'door', x1: p.x, y1: p.y, x2: p.x + DOOR_W, y2: p.y }); return; }
+    if (tool === 'window') { addEl({ type: 'window', x1: p.x, y1: p.y, x2: p.x + WIN_W, y2: p.y }); return; }
+    if (!start) { setStart(p); return; }
+    finish(p);
+  };
+  const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const s = local(e);
     if (panning.current) { const pn = panning.current; setView(v => ({ ...v, x: pn.vx + s.x - pn.sx, y: pn.vy + s.y - pn.sy })); return; }
     setMouse(toWorld(s.x, s.y));
@@ -282,7 +316,7 @@ export default function App() {
       if (e.key === 'Delete' || e.key === 'Backspace') { deleteSel(); return; }
       if (e.key === 'F8') { e.preventDefault(); setOrtho(o => !o); return; }
       if (e.key === 'F9') { e.preventDefault(); setSnapOn(o => !o); return; }
-      const t = TOOLS.find(t => t.key === e.key.toUpperCase()); if (t) { setTool(t.id); setStart(null); }
+      const t = TOOLS.find(tl => tl.key === e.key.toUpperCase()); if (t) { setTool(t.id); setStart(null); }
     };
     const ku = (e: KeyboardEvent) => { if (e.code === 'Space') spaceDown.current = false; };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
@@ -293,7 +327,12 @@ export default function App() {
   const startBlank = () => { setProject(p => ({ ...p, imageSrc: null, imageWidth: SHEET.W, imageHeight: SHEET.H, gridLines: [], elements: [] })); setStep(AppStep.GRID_MAPPING); };
   const onUpload = (f?: File) => {
     if (!f) return; const rd = new FileReader();
-    rd.onload = ev => { const i = new Image(); i.onload = () => { setProject(p => ({ ...p, imageSrc: ev.target?.result as string, imageWidth: i.width, imageHeight: i.height })); setStep(AppStep.GRID_MAPPING); }; i.src = ev.target?.result as string; };
+    rd.onload = ev => {
+      const src = ev.target?.result as string;
+      const i = new Image();
+      i.onload = () => { setProject(p => ({ ...p, imageSrc: src, imageWidth: i.width, imageHeight: i.height })); setStep(AppStep.GRID_MAPPING); };
+      i.src = src;
+    };
     rd.readAsDataURL(f);
   };
 
@@ -311,37 +350,30 @@ export default function App() {
     ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1; ctx.setLineDash([20, 10]);
     project.gridLines.forEach(l => { ctx.beginPath(); if (l.orientation === 'vertical') { ctx.moveTo(l.position, 0); ctx.lineTo(l.position, project.imageHeight); } else { ctx.moveTo(0, l.position); ctx.lineTo(project.imageWidth, l.position); } ctx.stroke(); });
     ctx.setLineDash([]); ctx.strokeStyle = '#000';
-    project.elements.filter(e => e.type === 'wall').forEach(e => {
+    project.elements.filter(e => kindOf(e) === 'wall').forEach(e => {
       const len = Math.hypot(e.x2 - e.x1, e.y2 - e.y1); ctx.save(); ctx.translate((e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2); ctx.rotate(Math.atan2(e.y2 - e.y1, e.x2 - e.x1));
       ctx.lineWidth = 4; ctx.strokeRect(-len / 2, -trenchWidth / 2, len, trenchWidth); ctx.lineWidth = 1; ctx.strokeRect(-len / 2, -wallWidth / 2, len, wallWidth); ctx.restore();
-      ctx.lineWidth = 5; [[e.x1, e.y1], [e.x2, e.y2]].forEach(([x, y]) => ctx.strokeRect(x - footingWidth / 2, y - footingWidth / 2, footingWidth, footingWidth));
+      ctx.lineWidth = 5; ([[e.x1, e.y1], [e.x2, e.y2]] as [number, number][]).forEach(([x, y]) => ctx.strokeRect(x - footingWidth / 2, y - footingWidth / 2, footingWidth, footingWidth));
     });
     ctx.restore(); return { title: 'Foundation plan', src: c.toDataURL('image/png') };
   };
   const elevation = (side: 'front' | 'rear') => {
     const { c, ctx } = newSheet(`${side.toUpperCase()} ELEVATION`); ctx.translate(100, 1500);
-    generateElevation(project, side as any).forEach((cmd: any) => {
-      if (cmd.type === 'rect') { ctx.fillStyle = cmd.fill || '#fff'; ctx.fillRect(...(cmd.coords as [number, number, number, number])); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(...(cmd.coords as [number, number, number, number])); }
-      else if (cmd.type === 'line') { ctx.beginPath(); ctx.moveTo(cmd.coords[0], cmd.coords[1]); ctx.lineTo(cmd.coords[2], cmd.coords[3]); ctx.stroke(); }
-      else if (cmd.type === 'poly') { ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(cmd.coords[0], cmd.coords[1]); for (let i = 2; i < cmd.coords.length; i += 2) ctx.lineTo(cmd.coords[i], cmd.coords[i + 1]); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    (generateElevation(project, side as any) as any[]).forEach((d: any) => {
+      if (d.type === 'rect') {
+        const [x, y, w, h] = d.coords as [number, number, number, number];
+        ctx.fillStyle = d.fill || '#fff'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+      } else if (d.type === 'line') {
+        ctx.beginPath(); ctx.moveTo(d.coords[0], d.coords[1]); ctx.lineTo(d.coords[2], d.coords[3]); ctx.stroke();
+      } else if (d.type === 'poly') {
+        ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(d.coords[0], d.coords[1]);
+        for (let i = 2; i < d.coords.length; i += 2) ctx.lineTo(d.coords[i], d.coords[i + 1]);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
     });
     return { title: `${side[0].toUpperCase() + side.slice(1)} elevation`, src: c.toDataURL('image/png') };
   };
 
-  // ---------- UI pieces ----------
-  const Btn = ({ on, onClick, title, children }: any) => (
-    <button title={title} onClick={onClick} style={{ background: on ? C.accent : 'transparent', color: on ? '#06121f' : C.text }}
-      className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1" >{children}</button>
-  );
-  const Num = ({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) => (
-    <label className="flex items-center justify-between gap-2 py-1 text-xs" style={{ color: C.dim }}>
-      {label}
-      <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} style={{ background: C.bg, borderColor: C.rule, color: C.text, fontFamily: MONO }} className="w-20 px-1.5 py-1 border rounded-[3px] text-right" />
-    </label>
-  );
-  const Section = ({ title, children }: any) => (
-    <div style={{ borderColor: C.rule }} className="border-b px-3 py-2.5"><div className="text-xs font-semibold mb-1.5" style={{ color: C.text }}>{title}</div>{children}</div>
-  );
   const selEl = project.elements.find(e => e.id === sel);
 
   if (activeModule === AppModule.DASHBOARD) return <Dashboard onSelectModule={setActiveModule} />;
@@ -400,7 +432,7 @@ export default function App() {
                 <label key={k} className="flex items-center gap-2 py-1 cursor-pointer"><input type="checkbox" checked={layers[k]} onChange={e => setLayers(s => ({ ...s, [k]: e.target.checked }))} />{l}</label>
               ))}
             </Section>
-            <Section title={selEl ? `Selected: ${selEl.type}` : 'Selection'}>
+            <Section title={selEl ? `Selected: ${kindOf(selEl)}` : 'Selection'}>
               {selEl ? <div style={{ fontFamily: MONO }} className="text-xs leading-6">
                 <div>Start {Math.round(selEl.x1)}, {Math.round(selEl.y1)}</div><div>End {Math.round(selEl.x2)}, {Math.round(selEl.y2)}</div>
                 <div>Length {Math.round(Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1))} mm</div>
