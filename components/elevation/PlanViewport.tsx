@@ -125,8 +125,8 @@ export const PlanViewport: React.FC<Props> = ({
     <div className="relative w-full h-full select-none">
       <div
         ref={wrap}
-        className="absolute inset-0 overflow-hidden bg-slate-600"
-        style={{ cursor: cursor ?? 'crosshair', touchAction: 'none' }}
+        className="absolute inset-0 overflow-hidden"
+        style={{ cursor: cursor ?? 'crosshair', touchAction: 'none', background: '#15171a' }}
         onPointerDown={handleDown}
         onPointerMove={handleMove}
         onPointerUp={handleUp}
@@ -135,7 +135,7 @@ export const PlanViewport: React.FC<Props> = ({
         onContextMenu={e => e.preventDefault()}
       >
         <div style={{ position: 'absolute', left: 0, top: 0, width, height, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.zoom})`, transformOrigin: '0 0' }}>
-          <img src={src} width={width} height={height} draggable={false} alt="plan" style={{ display: 'block', background: '#fff', boxShadow: '0 0 0 1px #475569' }} />
+          <img src={src} width={width} height={height} draggable={false} alt="plan" style={{ display: 'block', background: '#fff', boxShadow: '0 0 0 1px #2e333a' }} />
           <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             {overlay?.(view.zoom)}
           </svg>
@@ -143,11 +143,11 @@ export const PlanViewport: React.FC<Props> = ({
       </div>
       {children}
       <div className="absolute right-3 bottom-3 flex flex-col gap-1 z-10">
-        <button className="w-8 h-8 rounded bg-slate-900/90 border border-slate-600 text-white hover:bg-slate-700" onClick={() => zoomBy(1.25)} title="Zoom in">+</button>
-        <button className="w-8 h-8 rounded bg-slate-900/90 border border-slate-600 text-white hover:bg-slate-700" onClick={() => zoomBy(0.8)} title="Zoom out">−</button>
-        <button className="w-8 h-8 rounded bg-slate-900/90 border border-slate-600 text-white hover:bg-slate-700 text-[10px]" onClick={fit} title="Fit to window">FIT</button>
+        <button className="w-8 h-8 rounded-[3px] border border-[#2e333a] bg-[#1f2227] text-[#c9cfd6] hover:bg-[#2a2e35]" onClick={() => zoomBy(1.25)} title="Zoom in">+</button>
+        <button className="w-8 h-8 rounded-[3px] border border-[#2e333a] bg-[#1f2227] text-[#c9cfd6] hover:bg-[#2a2e35]" onClick={() => zoomBy(0.8)} title="Zoom out">−</button>
+        <button className="w-8 h-8 rounded-[3px] border border-[#2e333a] bg-[#1f2227] text-[#c9cfd6] hover:bg-[#2a2e35] text-[10px]" onClick={fit} title="Fit to window">FIT</button>
       </div>
-      <div className="absolute left-3 bottom-3 z-10 text-[10px] text-slate-300 bg-slate-900/80 px-2 py-1 rounded pointer-events-none">
+      <div className="absolute left-3 bottom-3 z-10 text-[10px] text-[#7d8590] bg-[#1f2227]/90 border border-[#2e333a] px-2 py-1 rounded-[3px] pointer-events-none" style={{ fontFamily: 'ui-monospace, "IBM Plex Mono", Consolas, monospace' }}>
         Scroll = zoom · drag / Space+drag = pan
       </div>
     </div>
