@@ -17,6 +17,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
       gradient: 'from-blue-500 to-cyan-400'
     },
     {
+      id: AppModule.ELEVATIONS,
+      title: 'Elevation Studio',
+      desc: 'Upload a plan (image or PDF), pick the external walls, windows and doors, and get front, rear and side elevations as clean black-and-white line drawings.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6M7 13h.01M17 13h.01" /></svg>
+      ),
+      gradient: 'from-rose-500 to-orange-400'
+    },
+    {
       id: AppModule.MEASUREMENT,
       title: 'Calculation & Measurement',
       desc: 'SMM7 Bill of Quantities, material take-offs, and cost estimation.',
@@ -60,7 +69,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
       </div>
 
       {/* CARDS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full">
         {modules.map((mod, idx) => (
           <button
             key={mod.id}

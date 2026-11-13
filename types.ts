@@ -4,7 +4,9 @@ export enum AppModule {
   DASHBOARD = 'DASHBOARD',
   DRAWINGS = 'DRAWINGS',
   MEASUREMENT = 'MEASUREMENT',
-  // New Modules can be added later
+  ELEVATIONS = 'ELEVATIONS',
+  METHOD_STUDY = 'METHOD_STUDY',
+  PHYSICS = 'PHYSICS',
 }
 
 export enum AppStep {
@@ -12,6 +14,7 @@ export enum AppStep {
   GRID_MAPPING = 'GRID_MAPPING',
   PLAN_DESIGN = 'PLAN_DESIGN', // Renamed from COLUMN_SELECTION
   GENERATION = 'GENERATION',
+  COLUMN_SELECTION = 'COLUMN_SELECTION', // legacy (CanvasEditor / Sidebar)
 }
 
 export type GridOrientation = 'vertical' | 'horizontal';
@@ -55,7 +58,24 @@ export interface ProjectSettings {
   wallWidth: number; // 225mm
   trenchWidth: number; // 450mm
   footingWidth: number; // 1000mm
-  // ... other structural settings
+  workingSpace: number;
+  blindingOffset: number;
+  foundationDepth: number; // mm
+  concreteGrade: string;
+}
+
+export interface BoQItem {
+  code: string;
+  description: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface BackendSpecData {
+  fileName: string;
+  language: string;
+  code: string;
+  description: string;
 }
 
 export interface ProjectState {

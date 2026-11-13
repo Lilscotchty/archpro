@@ -5,7 +5,7 @@ import { AppStep, ProjectState, AppModule, ElementType } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { QRCodeCanvas } from 'qrcode.react';
 import { createClient } from '@supabase/supabase-js';
-import { generateElevation } from './utils/elevationEngine';
+import { ElevationStudio, ElevationStudioProps } from './components/elevation/ElevationStudio';
 
 // --- CONFIGURATION ---
 const supabaseUrl = 'https://gsmobkuznwnspjhpxtbh.supabase.co'; 
@@ -15,6 +15,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // --- GLOBAL STYLES ---
 const GlobalStyles = () => (
   <style>{`
+    .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+    .sheet-preview { line-height: 0; }
     .app-bg { background-color: #0f172a; min-height: 100vh; color: #e2e8f0; }
     .canvas-container { 
       background-color: #334155; 
@@ -72,7 +74,7 @@ function App() {
   // OUTPUT STATE
   const [isUploading, setIsUploading] = useState(false);
   const [generatedSheet, setGeneratedSheet] = useState<string | null>(null);
-  const [generatedType, setGeneratedType] = useState<'foundation' | 'elevation' | null>(null);
+  const [generatedType, setGeneratedType] = useState<'foundation' | null>(null);
 
   // PROJECT STATE
   const [project, setProject] = useState<ProjectState>({
@@ -209,11 +211,15 @@ function App() {
   };
 
   // --- 2. CANVAS INTERACTION HANDLERS ---
+  // The canvas is drawn at image resolution but shown scaled by CSS, so convert screen px -> canvas px.
+  const canvasPoint = (e: React.MouseEvent) => {
+    const c = canvasRef.current;
+    if (!c) return { x: 0, y: 0 };
+    const r = c.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+  };
   const handleMouseDown = (e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = canvasPoint(e);
 
     setIsDrawing(true);
     setDragStart({ x, y });
@@ -221,19 +227,13 @@ function App() {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = canvasPoint(e);
     setCurrentMousePos({ x, y });
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!isDrawing || !dragStart) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = canvasPoint(e);
 
     const newElementBase = {
        id: Date.now().toString(),
@@ -390,57 +390,28 @@ function App() {
     setIsUploading(false);
   };
 
-  const generateElevations = async () => {
-    setGeneratedType('elevation');
-    setStep(AppStep.GENERATION);
-    setIsUploading(true);
-    
-    const W = 3508; const H = 2480;
-    const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.strokeRect(50,50,W-100,H-100);
-
-    ctx.save();
-    ctx.translate(100, 1500); 
-    const cmds = generateElevation(project, 'front');
-    cmds.forEach(cmd => {
-        if(cmd.type === 'rect') {
-            ctx.fillStyle = cmd.fill || '#fff'; ctx.fillRect(cmd.coords[0], cmd.coords[1], cmd.coords[2], cmd.coords[3]);
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(cmd.coords[0], cmd.coords[1], cmd.coords[2], cmd.coords[3]);
-        }
-        else if (cmd.type === 'line') {
-            ctx.beginPath(); ctx.moveTo(cmd.coords[0], cmd.coords[1]); ctx.lineTo(cmd.coords[2], cmd.coords[3]); ctx.stroke();
-        }
-        else if (cmd.type === 'poly') {
-            ctx.fillStyle = '#ddd'; ctx.beginPath();
-            ctx.moveTo(cmd.coords[0], cmd.coords[1]);
-            for(let i=2; i<cmd.coords.length; i+=2) ctx.lineTo(cmd.coords[i], cmd.coords[i+1]);
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-        }
+  // Elevations now live in the dedicated Elevation Studio (black & white, from plan image / PDF).
+  // Hand over the plan and any walls already drawn here so nothing has to be redone.
+  const [studioInitial, setStudioInitial] = useState<ElevationStudioProps['initial']>(undefined);
+  const openElevationStudio = () => {
+    setStudioInitial({
+      plan: project.imageSrc ? { src: project.imageSrc, width: project.imageWidth, height: project.imageHeight, name: 'Drafting Studio plan' } : null,
+      walls: project.elements.filter(e => e.type === 'wall').map(e => ({ id: e.id, x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2 })),
     });
-    ctx.restore();
-
-    ctx.fillStyle = '#000'; ctx.font = 'bold 50px Arial';
-    ctx.fillText("ELEVATIONS", 100, H-150);
-
-    const blob = await new Promise<Blob | null>(r => canvas.toBlob(r));
-    if(blob) {
-       const fileName = `elev_${Date.now()}.png`;
-       const { data } = await supabase.storage.from('plans').upload(fileName, blob);
-       if(data) {
-          const { data: { publicUrl } } = supabase.storage.from('plans').getPublicUrl(fileName);
-          setGeneratedSheet(publicUrl);
-       }
-    }
-    setIsUploading(false);
+    setActiveModule(AppModule.ELEVATIONS);
   };
 
   const renderContent = () => {
     if (activeModule === AppModule.DASHBOARD) return <Dashboard onSelectModule={setActiveModule} />;
+    if (activeModule === AppModule.ELEVATIONS) return <ElevationStudio key={studioInitial ? 'handoff' : 'fresh'} initial={studioInitial} onClose={() => { setStudioInitial(undefined); setActiveModule(AppModule.DASHBOARD); }} />;
+    if (activeModule === AppModule.METHOD_STUDY || activeModule === AppModule.PHYSICS) return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4 text-center p-8">
+        <div className="text-5xl">🚧</div>
+        <h2 className="text-2xl font-bold text-white">{activeModule === AppModule.METHOD_STUDY ? 'Method Study' : 'Building Physics Lab'}</h2>
+        <p className="text-slate-400 max-w-md">This module is coming soon.</p>
+        <button onClick={() => setActiveModule(AppModule.DASHBOARD)} className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 font-bold">Back to dashboard</button>
+      </div>
+    );
     if (activeModule === AppModule.MEASUREMENT) return <MeasurementModule project={project} onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
 
     return (
@@ -541,8 +512,8 @@ function App() {
                     <button onClick={generateFoundationPlan} className="w-full py-3 bg-slate-800 border border-slate-600 hover:bg-slate-700 rounded font-bold text-sm">
                       🏗️ Foundation Plan
                     </button>
-                    <button onClick={generateElevations} className="w-full py-3 bg-slate-800 border border-slate-600 hover:bg-slate-700 rounded font-bold text-sm">
-                      🏠 Elevations
+                    <button onClick={openElevationStudio} className="w-full py-3 bg-slate-800 border border-slate-600 hover:bg-slate-700 rounded font-bold text-sm">
+                      🏠 Elevations (Elevation Studio)
                     </button>
                   </div>
                 </div>
