@@ -1,8 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { MeasurementModule } from './components/MeasurementModule';
-import { AppStep, ProjectState, AppModule, ArchElement, GridLine } from './types';
-import { generateElevation } from './utils/elevationEngine';
+import { AppStep, ProjectState, AppModule } from './types';
+import { ElevationStudio } from './components/elevation/ElevationStudio';
+import type { ElevationStudioProps } from './components/elevation/ElevationStudio';
+
+// Derived from ProjectState so this file never depends on extra exports from ./types
+type ArchElement = ProjectState['elements'][number];
+type GridLine = ProjectState['gridLines'][number];
 
 type Tool = 'select' | 'pan' | 'grid' | 'wall' | 'rect' | 'door' | 'window';
 type Pt = { x: number; y: number };
@@ -16,6 +21,50 @@ const C = {
 const MONO = 'ui-monospace, "JetBrains Mono", Consolas, monospace';
 const SHEET = { W: 3508, H: 2480 };
 const DOOR_W = 900, WIN_W = 1200;
+
+// --- GLOBAL STYLES (kept from the old version: Dashboard / other modules rely on these classes) ---
+const GlobalStyles = () => (
+  <style>{`
+    .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+    .sheet-preview { line-height: 0; }
+    .app-bg { background-color: #0f172a; min-height: 100vh; color: #e2e8f0; }
+    .canvas-container { 
+      background-color: #334155; 
+      overflow: hidden;
+      cursor: crosshair;
+      position: relative;
+    }
+    .sheet-preview {
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid #475569;
+      background: white;
+    }
+    .tool-btn {
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+    .tool-btn:hover { background-color: #1e293b; }
+    .tool-btn.active {
+      background-color: #2563eb;
+      color: white;
+      border-color: #60a5fa;
+      box-shadow: 0 0 10px rgba(37, 99, 235, 0.3);
+    }
+    .dim-tooltip {
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      pointer-events: none;
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  `}</style>
+);
 
 const ICONS: Record<string, string> = {
   select: 'M5 3l14 8-6 2-2 6z',
@@ -53,7 +102,7 @@ const initialProject = (): ProjectState => ({
   generatedImageSrc: null, calculatedTrenchLength: 0,
 } as any);
 
-// ---------- small UI pieces (kept outside App so inputs don't remount and lose focus) ----------
+// ---------- small UI pieces (outside App so inputs don't remount and lose focus) ----------
 const Icon = ({ n, s = 18 }: { n: string; s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS[n]} /></svg>
 );
@@ -71,7 +120,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   <div style={{ borderColor: C.rule }} className="border-b px-3 py-2.5"><div className="text-xs font-semibold mb-1.5" style={{ color: C.text }}>{title}</div>{children}</div>
 );
 
-export default function App() {
+function App() {
   const [activeModule, setActiveModule] = useState<AppModule>(AppModule.DASHBOARD);
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [project, setProject] = useState<ProjectState>(initialProject());
@@ -86,6 +135,7 @@ export default function App() {
   const [cmd, setCmd] = useState('');
   const [sheet, setSheet] = useState<{ title: string; src: string } | null>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
+  const [studioInitial, setStudioInitial] = useState<ElevationStudioProps['initial']>(undefined);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,7 +144,12 @@ export default function App() {
   const panning = useRef<{ sx: number; sy: number; vx: number; vy: number } | null>(null);
   const spaceDown = useRef(false);
 
-  const inWorkspace = activeModule === AppModule.DRAWINGS || (activeModule !== AppModule.DASHBOARD && activeModule !== AppModule.MEASUREMENT);
+  const inWorkspace =
+    activeModule !== AppModule.DASHBOARD &&
+    activeModule !== AppModule.MEASUREMENT &&
+    activeModule !== AppModule.ELEVATIONS &&
+    activeModule !== AppModule.METHOD_STUDY &&
+    activeModule !== AppModule.PHYSICS;
   const drafting = inWorkspace && (step === AppStep.GRID_MAPPING || step === AppStep.PLAN_DESIGN);
 
   // ---------- model helpers ----------
@@ -203,9 +258,9 @@ export default function App() {
           ([[e.x1, e.y1], [e.x2, e.y2]] as [number, number][]).forEach(([x, y]) => ctx.fillRect(x - lw(4), y - lw(4), lw(8), lw(8)));
           ctx.fillStyle = C.text; ctx.fillText(`${Math.round(dist({ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }))}`, (e.x1 + e.x2) / 2 + lw(8), (e.y1 + e.y2) / 2 - lw(10));
         }
-      } else if (kind === 'opening' && layers.walls) {
-        ctx.strokeStyle = C.wall; ctx.lineWidth = lw(1.4);
-        const w = e.x2 - e.x1, h = e.y2 - e.y1; ctx.fillStyle = 'rgba(232,234,237,.06)'; ctx.fillRect(e.x1, e.y1, w, h); ctx.strokeRect(e.x1, e.y1, w, h);
+      } else if (kind === 'rect' && layers.walls) {
+        ctx.strokeStyle = on ? C.accent : C.wall; ctx.lineWidth = lw(1.4);
+        const w = e.x2 - e.x1, h = e.y2 - e.y1; ctx.fillStyle = on ? 'rgba(74,163,255,.2)' : 'rgba(232,234,237,.06)'; ctx.fillRect(e.x1, e.y1, w, h); ctx.strokeRect(e.x1, e.y1, w, h);
       } else if (kind === 'door' && layers.openings) {
         const w = Math.abs(e.x2 - e.x1) || DOOR_W;
         ctx.strokeStyle = on ? C.accent : C.door; ctx.lineWidth = lw(1.4);
@@ -254,7 +309,7 @@ export default function App() {
   const finish = (p: Pt) => {
     if (!start) return;
     if (tool === 'wall') addEl({ type: 'wall', x1: start.x, y1: start.y, x2: p.x, y2: p.y });
-    else if (tool === 'rect') addEl({ type: 'opening', x1: start.x, y1: start.y, x2: p.x, y2: p.y });
+    else if (tool === 'rect') addEl({ type: 'rect', x1: start.x, y1: start.y, x2: p.x, y2: p.y });
     else if (tool === 'grid') {
       const v = Math.abs(p.x - start.x) < Math.abs(p.y - start.y);
       const n = project.gridLines.filter(g => g.orientation === (v ? 'vertical' : 'horizontal')).length;
@@ -336,154 +391,173 @@ export default function App() {
     rd.readAsDataURL(f);
   };
 
-  // ---------- sheet generators ----------
-  const newSheet = (title: string) => {
-    const c = document.createElement('canvas'); c.width = SHEET.W; c.height = SHEET.H;
-    const ctx = c.getContext('2d')!; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.strokeRect(50, 50, c.width - 100, c.height - 100);
-    ctx.fillStyle = '#000'; ctx.font = 'bold 50px Arial'; ctx.fillText(title, 100, c.height - 150);
-    return { c, ctx };
-  };
+  // ---------- foundation plan sheet ----------
   const foundationPlan = () => {
-    const { c, ctx } = newSheet('FOUNDATION PLAN'); const { trenchWidth, wallWidth, footingWidth } = project.settings;
-    ctx.save(); ctx.translate(SHEET.W / 2 - project.imageWidth / 2, SHEET.H / 2 - project.imageHeight / 2);
+    const c = document.createElement('canvas'); c.width = SHEET.W; c.height = SHEET.H;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.strokeRect(50, 50, c.width - 100, c.height - 100);
+    ctx.fillStyle = '#000'; ctx.font = 'bold 50px Arial'; ctx.fillText('FOUNDATION PLAN', 100, c.height - 150);
+
+    const { trenchWidth, wallWidth, footingWidth } = project.settings;
+    const pw = project.imageWidth || SHEET.W, ph = project.imageHeight || SHEET.H;
+    ctx.save(); ctx.translate(SHEET.W / 2 - pw / 2, SHEET.H / 2 - ph / 2);
     ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1; ctx.setLineDash([20, 10]);
-    project.gridLines.forEach(l => { ctx.beginPath(); if (l.orientation === 'vertical') { ctx.moveTo(l.position, 0); ctx.lineTo(l.position, project.imageHeight); } else { ctx.moveTo(0, l.position); ctx.lineTo(project.imageWidth, l.position); } ctx.stroke(); });
+    project.gridLines.forEach(l => { ctx.beginPath(); if (l.orientation === 'vertical') { ctx.moveTo(l.position, 0); ctx.lineTo(l.position, ph); } else { ctx.moveTo(0, l.position); ctx.lineTo(pw, l.position); } ctx.stroke(); });
     ctx.setLineDash([]); ctx.strokeStyle = '#000';
     project.elements.filter(e => kindOf(e) === 'wall').forEach(e => {
       const len = Math.hypot(e.x2 - e.x1, e.y2 - e.y1); ctx.save(); ctx.translate((e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2); ctx.rotate(Math.atan2(e.y2 - e.y1, e.x2 - e.x1));
       ctx.lineWidth = 4; ctx.strokeRect(-len / 2, -trenchWidth / 2, len, trenchWidth); ctx.lineWidth = 1; ctx.strokeRect(-len / 2, -wallWidth / 2, len, wallWidth); ctx.restore();
       ctx.lineWidth = 5; ([[e.x1, e.y1], [e.x2, e.y2]] as [number, number][]).forEach(([x, y]) => ctx.strokeRect(x - footingWidth / 2, y - footingWidth / 2, footingWidth, footingWidth));
     });
-    ctx.restore(); return { title: 'Foundation plan', src: c.toDataURL('image/png') };
-  };
-  const elevation = (side: 'front' | 'rear') => {
-    const { c, ctx } = newSheet(`${side.toUpperCase()} ELEVATION`); ctx.translate(100, 1500);
-    (generateElevation(project, side as any) as any[]).forEach((d: any) => {
-      if (d.type === 'rect') {
-        const [x, y, w, h] = d.coords as [number, number, number, number];
-        ctx.fillStyle = d.fill || '#fff'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
-      } else if (d.type === 'line') {
-        ctx.beginPath(); ctx.moveTo(d.coords[0], d.coords[1]); ctx.lineTo(d.coords[2], d.coords[3]); ctx.stroke();
-      } else if (d.type === 'poly') {
-        ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(d.coords[0], d.coords[1]);
-        for (let i = 2; i < d.coords.length; i += 2) ctx.lineTo(d.coords[i], d.coords[i + 1]);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
+    project.elements.filter(e => kindOf(e) === 'rect').forEach(e => {
+      const w = e.x2 - e.x1, h = e.y2 - e.y1;
+      ctx.fillStyle = 'rgba(200,200,200,0.2)'; ctx.fillRect(e.x1, e.y1, w, h);
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeRect(e.x1, e.y1, w, h);
     });
-    return { title: `${side[0].toUpperCase() + side.slice(1)} elevation`, src: c.toDataURL('image/png') };
+    ctx.restore();
+    return { title: 'Foundation plan', src: c.toDataURL('image/png') };
+  };
+
+  // Elevations live in the Elevation Studio. Hand over the plan and any walls already drawn here.
+  const openElevationStudio = () => {
+    setStudioInitial({
+      plan: project.imageSrc ? { src: project.imageSrc, width: project.imageWidth, height: project.imageHeight, name: 'Drafting Studio plan' } : null,
+      walls: project.elements.filter(e => kindOf(e) === 'wall').map(e => ({ id: e.id, x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2 })),
+    });
+    setActiveModule(AppModule.ELEVATIONS);
   };
 
   const selEl = project.elements.find(e => e.id === sel);
-
-  if (activeModule === AppModule.DASHBOARD) return <Dashboard onSelectModule={setActiveModule} />;
-  if (activeModule === AppModule.MEASUREMENT) return <MeasurementModule project={project} onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
-
   const hint = start ? (tool === 'rect' ? 'Pick opposite corner, or type width,height' : 'Pick next point, or type a length. Esc to finish') : tool === 'select' ? 'Click an object to select it' : tool === 'door' || tool === 'window' ? 'Click to place' : 'Pick start point';
 
-  return (
-    <div className="h-screen w-full flex flex-col select-none" style={{ background: C.bg, color: C.text, fontFamily: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif', fontSize: 13 }}>
-      {/* title bar */}
-      <header style={{ background: C.panel, borderColor: C.rule }} className="h-11 flex items-center gap-3 px-3 border-b">
-        <button onClick={() => setActiveModule(AppModule.DASHBOARD)} className="font-semibold tracking-tight hover:text-white" title="Back to dashboard">ArchPro</button>
-        <span style={{ color: C.dim }}>/ Drafting studio</span>
-        <div className="flex-1" />
-        {drafting && <>
-          <button onClick={() => setSheet(foundationPlan())} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Foundation plan</button>
-          <button onClick={() => setSheet(elevation('front'))} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Front elevation</button>
-          <button onClick={() => setSheet(elevation('rear'))} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Rear elevation</button>
-        </>}
-      </header>
+  const renderContent = () => {
+    if (activeModule === AppModule.DASHBOARD) return <Dashboard onSelectModule={setActiveModule} />;
+    if (activeModule === AppModule.ELEVATIONS) return (
+      <ElevationStudio key={studioInitial ? 'handoff' : 'fresh'} initial={studioInitial} onClose={() => { setStudioInitial(undefined); setActiveModule(AppModule.DASHBOARD); }} />
+    );
+    if (activeModule === AppModule.METHOD_STUDY || activeModule === AppModule.PHYSICS) return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4 text-center p-8">
+        <div className="text-5xl">🚧</div>
+        <h2 className="text-2xl font-bold text-white">{activeModule === AppModule.METHOD_STUDY ? 'Method Study' : 'Building Physics Lab'}</h2>
+        <p className="text-slate-400 max-w-md">This module is coming soon.</p>
+        <button onClick={() => setActiveModule(AppModule.DASHBOARD)} className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 font-bold">Back to dashboard</button>
+      </div>
+    );
+    if (activeModule === AppModule.MEASUREMENT) return <MeasurementModule project={project} onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
 
-      {!drafting ? (
-        <main className="flex-1 grid place-items-center">
-          <div className="w-[520px] grid grid-cols-2 gap-4">
-            <label style={{ background: C.panel, borderColor: C.rule }} className="border rounded-[3px] p-6 cursor-pointer hover:border-[#4aa3ff]">
-              <input type="file" accept="image/*" className="hidden" onChange={e => onUpload(e.target.files?.[0])} />
-              <Icon n="upload" s={26} /><div className="mt-3 font-semibold">Open floor plan</div><div style={{ color: C.dim }} className="mt-1">Use an image as an underlay and trace over it.</div>
-            </label>
-            <button onClick={startBlank} style={{ background: C.panel, borderColor: C.rule }} className="border rounded-[3px] p-6 text-left hover:border-[#4aa3ff]">
-              <Icon n="rect" s={26} /><div className="mt-3 font-semibold">New blank sheet</div><div style={{ color: C.dim }} className="mt-1">A3 landscape, units in millimetres.</div>
-            </button>
-          </div>
-        </main>
-      ) : (
-        <div className="flex-1 flex min-h-0">
-          {/* tool palette */}
-          <nav style={{ background: C.panel, borderColor: C.rule }} className="w-12 border-r flex flex-col items-center py-2 gap-1">
-            {TOOLS.map(t => <Btn key={t.id} on={tool === t.id} title={`${t.label} (${t.key})`} onClick={() => { setTool(t.id); setStart(null); }}><Icon n={t.id} /></Btn>)}
-            <div style={{ background: C.rule }} className="w-6 h-px my-1" />
-            <Btn title="Undo (Ctrl+Z)" onClick={undo}><Icon n="undo" /></Btn>
-            <Btn title="Zoom to sheet" onClick={fit}><Icon n="fit" /></Btn>
-            <Btn title="Delete (Del)" onClick={deleteSel}><Icon n="trash" /></Btn>
-          </nav>
+    return (
+      <div className="h-screen w-full flex flex-col select-none" style={{ background: C.bg, color: C.text, fontFamily: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif', fontSize: 13 }}>
+        {/* title bar */}
+        <header style={{ background: C.panel, borderColor: C.rule }} className="h-11 flex items-center gap-3 px-3 border-b">
+          <button onClick={() => setActiveModule(AppModule.DASHBOARD)} className="font-semibold tracking-tight hover:text-white" title="Back to dashboard">ArchPro</button>
+          <span style={{ color: C.dim }}>/ Drafting studio</span>
+          <div className="flex-1" />
+          {drafting && <>
+            <button onClick={() => setSheet(foundationPlan())} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Foundation plan</button>
+            <button onClick={openElevationStudio} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Elevations</button>
+          </>}
+        </header>
 
-          {/* viewport */}
-          <div ref={wrapRef} className="flex-1 relative min-w-0" style={{ cursor: tool === 'pan' ? 'grab' : tool === 'select' ? 'default' : 'none' }}>
-            <canvas ref={canvasRef} style={{ width: size.w, height: size.h, touchAction: 'none' }} className="absolute inset-0"
-              onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onContextMenu={e => { e.preventDefault(); setStart(null); }} />
-            <div style={{ background: 'rgba(31,34,39,.9)', borderColor: C.rule, fontFamily: MONO }} className="absolute left-3 top-3 px-2.5 py-1.5 border rounded-[3px] text-xs">{hint}</div>
-          </div>
-
-          {/* properties + layers */}
-          <aside style={{ background: C.panel, borderColor: C.rule }} className="w-64 border-l overflow-y-auto">
-            <Section title="Layers">
-              {([['underlay', 'Underlay image'], ['grid', 'Structural grid'], ['walls', 'Walls'], ['openings', 'Doors and windows']] as const).map(([k, l]) => (
-                <label key={k} className="flex items-center gap-2 py-1 cursor-pointer"><input type="checkbox" checked={layers[k]} onChange={e => setLayers(s => ({ ...s, [k]: e.target.checked }))} />{l}</label>
-              ))}
-            </Section>
-            <Section title={selEl ? `Selected: ${kindOf(selEl)}` : 'Selection'}>
-              {selEl ? <div style={{ fontFamily: MONO }} className="text-xs leading-6">
-                <div>Start {Math.round(selEl.x1)}, {Math.round(selEl.y1)}</div><div>End {Math.round(selEl.x2)}, {Math.round(selEl.y2)}</div>
-                <div>Length {Math.round(Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1))} mm</div>
-              </div> : <div style={{ color: C.dim }}>{sel ? 'Grid line selected.' : 'Nothing selected.'}</div>}
-            </Section>
-            <Section title="Wall and foundation (mm)">
-              <Num label="Wall thickness" value={project.settings.wallWidth} onChange={n => setProject(p => ({ ...p, settings: { ...p.settings, wallWidth: n } }))} />
-              <Num label="Trench width" value={project.settings.trenchWidth} onChange={n => setProject(p => ({ ...p, settings: { ...p.settings, trenchWidth: n } }))} />
-              <Num label="Footing pad" value={project.settings.footingWidth} onChange={n => setProject(p => ({ ...p, settings: { ...p.settings, footingWidth: n } }))} />
-            </Section>
-            <Section title="Building heights (mm)">
-              <Num label="Floor height" value={project.specs.floorHeight} onChange={n => setProject(p => ({ ...p, specs: { ...p.specs, floorHeight: n } }))} />
-              <Num label="Plinth height" value={project.specs.plinthHeight} onChange={n => setProject(p => ({ ...p, specs: { ...p.specs, plinthHeight: n } }))} />
-            </Section>
-          </aside>
-        </div>
-      )}
-
-      {/* command line */}
-      {drafting && (
-        <div style={{ background: C.panel, borderColor: C.rule, fontFamily: MONO }} className="border-t flex items-center gap-2 px-3 h-9">
-          <span style={{ color: C.accent }}>{TOOLS.find(t => t.id === tool)?.label.toLowerCase()}:</span>
-          <input value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') runCommand(); if (e.key === 'Escape') { setCmd(''); setStart(null); } }}
-            placeholder={start ? (tool === 'rect' ? 'width,height' : 'length in mm') : 'type values while drawing'} className="flex-1 bg-transparent outline-none text-xs" />
-        </div>
-      )}
-
-      {/* status bar */}
-      <footer style={{ background: '#181a1e', borderColor: C.rule, fontFamily: MONO, color: C.dim }} className="h-7 border-t flex items-center gap-4 px-3 text-xs">
-        <span style={{ color: C.text }} className="w-44">X {drafting ? Math.round(cursor.x) : 0}  Y {drafting ? Math.round(cursor.y) : 0}</span>
-        <button onClick={() => setSnapOn(s => !s)} style={{ color: snapOn ? C.accent : C.dim }}>SNAP F9</button>
-        <button onClick={() => setOrtho(o => !o)} style={{ color: ortho ? C.accent : C.dim }}>ORTHO F8</button>
-        <span>{Math.round(view.z * 100)}%</span><span>mm</span>
-        <span className="flex-1" /><span>{project.elements.length} objects</span>
-      </footer>
-
-      {/* sheet viewer */}
-      {sheet && (
-        <div className="fixed inset-0 z-50 grid place-items-center" style={{ background: 'rgba(10,11,13,.8)' }} onClick={() => setSheet(null)}>
-          <div style={{ background: C.panel, borderColor: C.rule }} className="border rounded-[3px] max-w-[92vw] max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: C.rule }}>
-              <span className="font-semibold">{sheet.title}</span>
-              <span className="flex gap-2">
-                <a href={sheet.src} download={`${sheet.title.replace(/\s+/g, '-').toLowerCase()}.png`} style={{ background: C.accent, color: '#06121f' }} className="px-3 py-1.5 rounded-[3px] font-medium">Download PNG</a>
-                <button onClick={() => setSheet(null)} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px]">Close</button>
-              </span>
+        {!drafting ? (
+          <main className="flex-1 grid place-items-center">
+            <div className="w-[520px] grid grid-cols-2 gap-4">
+              <label style={{ background: C.panel, borderColor: C.rule }} className="border rounded-[3px] p-6 cursor-pointer hover:border-[#4aa3ff]">
+                <input type="file" accept="image/*" className="hidden" onChange={e => onUpload(e.target.files?.[0])} />
+                <Icon n="upload" s={26} /><div className="mt-3 font-semibold">Open floor plan</div><div style={{ color: C.dim }} className="mt-1">Use an image as an underlay and trace over it.</div>
+              </label>
+              <button onClick={startBlank} style={{ background: C.panel, borderColor: C.rule }} className="border rounded-[3px] p-6 text-left hover:border-[#4aa3ff]">
+                <Icon n="rect" s={26} /><div className="mt-3 font-semibold">New blank sheet</div><div style={{ color: C.dim }} className="mt-1">A3 landscape, units in millimetres.</div>
+              </button>
             </div>
-            <div className="overflow-auto p-4 bg-[#0f1113]"><img src={sheet.src} className="max-w-full bg-white" alt={sheet.title} /></div>
+          </main>
+        ) : (
+          <div className="flex-1 flex min-h-0">
+            {/* tool palette */}
+            <nav style={{ background: C.panel, borderColor: C.rule }} className="w-12 border-r flex flex-col items-center py-2 gap-1">
+              {TOOLS.map(t => <Btn key={t.id} on={tool === t.id} title={`${t.label} (${t.key})`} onClick={() => { setTool(t.id); setStart(null); }}><Icon n={t.id} /></Btn>)}
+              <div style={{ background: C.rule }} className="w-6 h-px my-1" />
+              <Btn title="Undo (Ctrl+Z)" onClick={undo}><Icon n="undo" /></Btn>
+              <Btn title="Zoom to sheet" onClick={fit}><Icon n="fit" /></Btn>
+              <Btn title="Delete (Del)" onClick={deleteSel}><Icon n="trash" /></Btn>
+            </nav>
+
+            {/* viewport */}
+            <div ref={wrapRef} className="flex-1 relative min-w-0" style={{ cursor: tool === 'pan' ? 'grab' : tool === 'select' ? 'default' : 'none' }}>
+              <canvas ref={canvasRef} style={{ width: size.w, height: size.h, touchAction: 'none' }} className="absolute inset-0"
+                onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onContextMenu={e => { e.preventDefault(); setStart(null); }} />
+              <div style={{ background: 'rgba(31,34,39,.9)', borderColor: C.rule, fontFamily: MONO }} className="absolute left-3 top-3 px-2.5 py-1.5 border rounded-[3px] text-xs">{hint}</div>
+            </div>
+
+            {/* properties + layers */}
+            <aside style={{ background: C.panel, borderColor: C.rule }} className="w-64 border-l overflow-y-auto">
+              <Section title="Layers">
+                {([['underlay', 'Underlay image'], ['grid', 'Structural grid'], ['walls', 'Walls'], ['openings', 'Doors and windows']] as const).map(([k, l]) => (
+                  <label key={k} className="flex items-center gap-2 py-1 cursor-pointer"><input type="checkbox" checked={layers[k]} onChange={e => setLayers(s => ({ ...s, [k]: e.target.checked }))} />{l}</label>
+                ))}
+              </Section>
+              <Section title={selEl ? `Selected: ${kindOf(selEl)}` : 'Selection'}>
+                {selEl ? <div style={{ fontFamily: MONO }} className="text-xs leading-6">
+                  <div>Start {Math.round(selEl.x1)}, {Math.round(selEl.y1)}</div><div>End {Math.round(selEl.x2)}, {Math.round(selEl.y2)}</div>
+                  <div>Length {Math.round(Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1))} mm</div>
+                </div> : <div style={{ color: C.dim }}>{sel ? 'Grid line selected.' : 'Nothing selected.'}</div>}
+              </Section>
+              <Section title="Wall and foundation (mm)">
+                <Num label="Wall thickness" value={project.settings.wallWidth} onChange={n => setProject(p => ({ ...p, settings: { ...p.settings, wallWidth: n } }))} />
+                <Num label="Trench width" value={project.settings.trenchWidth} onChange={n => setProject(p => ({ ...p, settings: { ...p.settings, trenchWidth: n } }))} />
+                <Num label="Footing pad" value={project.settings.footingWidth} onChange={n => setProject(p => ({ ...p, settings: { ...p.settings, footingWidth: n } }))} />
+              </Section>
+              <Section title="Building heights (mm)">
+                <Num label="Floor height" value={project.specs.floorHeight} onChange={n => setProject(p => ({ ...p, specs: { ...p.specs, floorHeight: n } }))} />
+                <Num label="Plinth height" value={project.specs.plinthHeight} onChange={n => setProject(p => ({ ...p, specs: { ...p.specs, plinthHeight: n } }))} />
+              </Section>
+            </aside>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* command line */}
+        {drafting && (
+          <div style={{ background: C.panel, borderColor: C.rule, fontFamily: MONO }} className="border-t flex items-center gap-2 px-3 h-9">
+            <span style={{ color: C.accent }}>{TOOLS.find(t => t.id === tool)?.label.toLowerCase()}:</span>
+            <input value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') runCommand(); if (e.key === 'Escape') { setCmd(''); setStart(null); } }}
+              placeholder={start ? (tool === 'rect' ? 'width,height' : 'length in mm') : 'type values while drawing'} className="flex-1 bg-transparent outline-none text-xs" />
+          </div>
+        )}
+
+        {/* status bar */}
+        <footer style={{ background: '#181a1e', borderColor: C.rule, fontFamily: MONO, color: C.dim }} className="h-7 border-t flex items-center gap-4 px-3 text-xs">
+          <span style={{ color: C.text }} className="w-44">X {drafting ? Math.round(cursor.x) : 0}  Y {drafting ? Math.round(cursor.y) : 0}</span>
+          <button onClick={() => setSnapOn(s => !s)} style={{ color: snapOn ? C.accent : C.dim }}>SNAP F9</button>
+          <button onClick={() => setOrtho(o => !o)} style={{ color: ortho ? C.accent : C.dim }}>ORTHO F8</button>
+          <span>{Math.round(view.z * 100)}%</span><span>mm</span>
+          <span className="flex-1" /><span>{project.elements.length} objects</span>
+        </footer>
+
+        {/* sheet viewer */}
+        {sheet && (
+          <div className="fixed inset-0 z-50 grid place-items-center" style={{ background: 'rgba(10,11,13,.8)' }} onClick={() => setSheet(null)}>
+            <div style={{ background: C.panel, borderColor: C.rule }} className="border rounded-[3px] max-w-[92vw] max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: C.rule }}>
+                <span className="font-semibold">{sheet.title}</span>
+                <span className="flex gap-2">
+                  <a href={sheet.src} download={`${sheet.title.replace(/\s+/g, '-').toLowerCase()}.png`} style={{ background: C.accent, color: '#06121f' }} className="px-3 py-1.5 rounded-[3px] font-medium">Download PNG</a>
+                  <button onClick={() => setSheet(null)} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px]">Close</button>
+                </span>
+              </div>
+              <div className="overflow-auto p-4 bg-[#0f1113]"><img src={sheet.src} className="max-w-full bg-white" alt={sheet.title} /></div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="app-bg font-sans">
+      <GlobalStyles />
+      {renderContent()}
     </div>
   );
 }
+
+export default App;
