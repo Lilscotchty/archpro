@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { MeasurementModule } from './components/MeasurementModule';
 import { AppStep, ProjectState, AppModule, ArchElement, GridLine } from './types';
-import { generateElevation } from './utils/elevationEngine';
+import { generateElevation } from './utils/elevation';
 
 type Tool = 'select' | 'pan' | 'grid' | 'wall' | 'rect' | 'door' | 'window';
 type Pt = { x: number; y: number };
