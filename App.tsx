@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Dashboard } from './components/Dashboard';
+import { ComingSoon } from './components/ComingSoon';
 import { MeasurementModule } from './components/MeasurementModule';
 import { AppStep, ProjectState, AppModule } from './types';
 import { ElevationStudio } from './components/elevation/ElevationStudio';
@@ -106,7 +107,7 @@ const initialProject = (): ProjectState => ({
 const Icon = ({ n, s = 18 }: { n: string; s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS[n]} /></svg>
 );
-const Btn = ({ on, onClick, title, children }: { on?: boolean; onClick: () => void; title: string; children: React.ReactNode }) => (
+const Btn: React.FC<{ on?: boolean; onClick: () => void; title: string; children: React.ReactNode }> = ({ on, onClick, title, children }) => (
   <button title={title} onClick={onClick} style={{ background: on ? C.accent : 'transparent', color: on ? '#06121f' : C.text }}
     className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1">{children}</button>
 );
@@ -436,14 +437,8 @@ function App() {
     if (activeModule === AppModule.ELEVATIONS) return (
       <ElevationStudio key={studioInitial ? 'handoff' : 'fresh'} initial={studioInitial} onClose={() => { setStudioInitial(undefined); setActiveModule(AppModule.DASHBOARD); }} />
     );
-    if (activeModule === AppModule.METHOD_STUDY || activeModule === AppModule.PHYSICS) return (
-      <div className="flex flex-col items-center justify-center h-screen gap-4 text-center p-8">
-        <div className="text-5xl">🚧</div>
-        <h2 className="text-2xl font-bold text-white">{activeModule === AppModule.METHOD_STUDY ? 'Method Study' : 'Building Physics Lab'}</h2>
-        <p className="text-slate-400 max-w-md">This module is coming soon.</p>
-        <button onClick={() => setActiveModule(AppModule.DASHBOARD)} className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 font-bold">Back to dashboard</button>
-      </div>
-    );
+    if (activeModule === AppModule.METHOD_STUDY) return <ComingSoon title="Method study" icon="method" onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
+    if (activeModule === AppModule.PHYSICS) return <ComingSoon title="Building physics" icon="physics" onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
     if (activeModule === AppModule.MEASUREMENT) return <MeasurementModule project={project} onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
 
     return (

@@ -90,7 +90,7 @@ const warnCls = 'text-xs text-[#f5b83d] bg-[#f5b83d]/10 border border-[#f5b83d]/
 const Icon = ({ n, s = 18 }: { n: string; s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS[n]} /></svg>
 );
-const PaletteBtn = ({ on, onClick, title, disabled, children }: { on?: boolean; onClick: () => void; title: string; disabled?: boolean; children: React.ReactNode }) => (
+const PaletteBtn: React.FC<{ on?: boolean; onClick: () => void; title: string; disabled?: boolean; children: React.ReactNode }> = ({ on, onClick, title, disabled, children }) => (
   <button title={title} onClick={onClick} disabled={disabled} style={{ background: on ? UI.accent : 'transparent', color: on ? '#06121f' : UI.text }}
     className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline outline-2 outline-offset-1">{children}</button>
 );
