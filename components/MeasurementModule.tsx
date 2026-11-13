@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ProjectState, BoQItem } from '../types';
 import { generateSMM7BoQ } from '../utils/smm7Engine';
+import { Field, Icon, Screen, Section, Segmented, Tag, UI, MONO, boxCls, btnGhost, btnPrimary, inputCls } from './ui';
 
 interface MeasurementModuleProps {
   project: ProjectState;
@@ -49,149 +50,104 @@ export const MeasurementModule: React.FC<MeasurementModuleProps> = ({ project, o
     a.click();
   };
 
+  const num = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
+  const hasLayout = !!project.calculatedTrenchLength;
+
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-900 text-slate-200">
-      {/* Header */}
-      <div className="h-16 border-b border-slate-700 flex items-center justify-between px-6 bg-slate-800 shadow-md z-10">
-        <div className="flex items-center gap-4">
-          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            <span className="text-sm font-medium">Dashboard</span>
-          </button>
-          <div className="h-6 w-px bg-slate-600 mx-2"></div>
-          <h1 className="text-lg font-bold text-white">Measurement <span className="text-slate-400 font-normal">/ SMM7 Engine</span></h1>
-        </div>
-        <div className="flex gap-3">
-           <button onClick={downloadCSV} disabled={boq.length === 0} className="disabled:opacity-50 disabled:cursor-not-allowed bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition-colors">
-             Export CSV
-           </button>
-           <button className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium shadow-lg shadow-emerald-900/20">
-             Save to Cloud
-           </button>
-        </div>
-      </div>
+    <Screen
+      crumb="Measurement / SMM7"
+      onHome={onClose}
+      actions={
+        <>
+          <button onClick={downloadCSV} disabled={boq.length === 0} className={btnGhost}><span className="inline-flex items-center gap-1.5"><Icon n="download" s={14} />Export CSV</span></button>
+          <button onClick={handleCalculate} className={btnPrimary}>Generate bill of quantities</button>
+        </>
+      }
+    >
+      <div className="flex-1 flex min-h-0">
+        {/* ---------------- inputs */}
+        <aside style={{ background: UI.panel, borderColor: UI.rule }} className="w-80 border-r shrink-0 overflow-y-auto">
+          <Section title="Source">
+            <Segmented value={activeTab} onChange={id => setActiveTab(id as 'manual' | 'import')}
+              options={[{ id: 'manual', label: 'Manual input' }, { id: 'import', label: 'From drafting' }]} />
+          </Section>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel: Inputs */}
-        <div className="w-96 border-r border-slate-700 bg-slate-800/50 p-6 flex flex-col gap-6 overflow-y-auto">
-          
-          <div className="flex p-1 bg-slate-700/50 rounded-lg border border-slate-700">
-            <button 
-              onClick={() => setActiveTab('manual')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'manual' ? 'bg-slate-600 text-white shadow ring-1 ring-slate-500' : 'text-slate-400 hover:text-white'}`}
-            >
-              Manual Input
-            </button>
-            <button 
-              onClick={() => setActiveTab('import')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'import' ? 'bg-slate-600 text-white shadow ring-1 ring-slate-500' : 'text-slate-400 hover:text-white'}`}
-            >
-              Import Layout
-            </button>
-          </div>
-
-          <div className="space-y-6">
-            {activeTab === 'manual' ? (
-              <div className="space-y-4 animate-fade-in">
-                <div className="group">
-                  <label className="text-xs uppercase text-slate-500 font-bold mb-1 block group-focus-within:text-blue-400">Total Trench Length (m)</label>
-                  <input type="number" value={manualLength} onChange={e => setManualLength(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 focus:border-blue-500 rounded p-2 text-white outline-none transition-colors" placeholder="0.00" />
-                </div>
-                <div className="group">
-                  <label className="text-xs uppercase text-slate-500 font-bold mb-1 block group-focus-within:text-blue-400">Avg. Depth (m)</label>
-                  <input type="number" value={manualDepth} onChange={e => setManualDepth(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 focus:border-blue-500 rounded p-2 text-white outline-none transition-colors" />
-                </div>
-                <div className="group">
-                  <label className="text-xs uppercase text-slate-500 font-bold mb-1 block group-focus-within:text-blue-400">Trench Width (m)</label>
-                  <input type="number" value={manualWidth} onChange={e => setManualWidth(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-700 focus:border-blue-500 rounded p-2 text-white outline-none transition-colors" />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4 animate-fade-in">
-                <div className={`p-6 border rounded-xl ${project.calculatedTrenchLength ? 'bg-blue-900/10 border-blue-500/30' : 'bg-red-900/10 border-red-500/30'}`}>
-                  <label className="text-xs uppercase text-slate-500 font-bold block mb-2">Project Data Status</label>
-                  {project.calculatedTrenchLength ? (
-                    <>
-                      <div className="text-3xl font-bold text-blue-400 mb-1">{project.calculatedTrenchLength.toFixed(2)} <span className="text-lg text-slate-500">m</span></div>
-                      <p className="text-xs text-slate-400">Net length calculated from "Drawings".</p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-lg font-bold text-red-400 mb-1">No Data Found</div>
-                      <p className="text-xs text-red-300/70">Go to "Drawings" and generate a foundation plan first.</p>
-                    </>
-                  )}
-                </div>
-                
-                {project.calculatedTrenchLength && (
-                   <div className="p-4 bg-slate-800 rounded border border-slate-700 text-xs text-slate-400 space-y-1">
-                      <div className="flex justify-between"><span>Design Depth:</span> <span className="text-slate-200">{project.settings.foundationDepth/1000}m</span></div>
-                      <div className="flex justify-between"><span>Design Width:</span> <span className="text-slate-200">{project.settings.trenchWidth/1000}m</span></div>
-                      <div className="flex justify-between"><span>Concrete:</span> <span className="text-slate-200">{project.settings.concreteGrade}</span></div>
-                   </div>
+          {activeTab === 'manual' ? (
+            <Section title="Trench">
+              <Field label="Total trench length (m)"><input type="number" className={inputCls} value={manualLength} onChange={e => setManualLength(num(e.target.value))} placeholder="0.00" /></Field>
+              <Field label="Average depth (m)"><input type="number" className={inputCls} value={manualDepth} onChange={e => setManualDepth(num(e.target.value))} /></Field>
+              <Field label="Trench width (m)"><input type="number" className={inputCls} value={manualWidth} onChange={e => setManualWidth(num(e.target.value))} /></Field>
+            </Section>
+          ) : (
+            <Section title="Drafting data">
+              <div className={boxCls}>
+                <div className="text-xs" style={{ color: UI.dim }}>Net trench length</div>
+                {hasLayout ? (
+                  <>
+                    <div className="mt-1 text-2xl" style={{ fontFamily: MONO, color: '#e6e9ed' }}>{project.calculatedTrenchLength!.toFixed(2)}<span className="text-sm" style={{ color: UI.dim }}> m</span></div>
+                    <div className="mt-1 text-[11px]" style={{ color: UI.dim }}>Calculated from the Drafting studio.</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-1 font-semibold" style={{ color: UI.danger }}>No data yet</div>
+                    <div className="mt-1 text-[11px]" style={{ color: UI.dim }}>Open the Drafting studio and generate a foundation plan first.</div>
+                  </>
                 )}
               </div>
-            )}
+              {hasLayout && (
+                <div className={`${boxCls} text-xs space-y-1`} style={{ fontFamily: MONO }}>
+                  <div className="flex justify-between"><span style={{ color: UI.dim }}>Depth</span><span>{project.settings.foundationDepth / 1000} m</span></div>
+                  <div className="flex justify-between"><span style={{ color: UI.dim }}>Width</span><span>{project.settings.trenchWidth / 1000} m</span></div>
+                  <div className="flex justify-between"><span style={{ color: UI.dim }}>Concrete</span><span>{project.settings.concreteGrade}</span></div>
+                </div>
+              )}
+            </Section>
+          )}
+        </aside>
 
-            <button 
-              onClick={handleCalculate}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-900/20 transition-all transform active:scale-[0.98]"
-            >
-              Generate Bill of Quantities
-            </button>
-          </div>
-        </div>
-
-        {/* Right Panel: Results */}
-        <div className="flex-1 bg-slate-950 p-8 overflow-y-auto">
-           {boq.length > 0 ? (
-             <div className="max-w-4xl mx-auto animate-slide-up">
-               <div className="flex items-center justify-between mb-6">
-                 <h2 className="text-2xl font-bold text-white">Bill of Quantities</h2>
-                 <span className="text-xs font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 rounded">SMM7 COMPLIANT</span>
-               </div>
-               
-               <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-2xl">
-                 <table className="w-full text-left">
-                   <thead className="bg-slate-950/50 text-slate-400 uppercase text-xs font-bold border-b border-slate-800">
-                     <tr>
-                       <th className="px-6 py-4 w-24">Ref</th>
-                       <th className="px-6 py-4">Description</th>
-                       <th className="px-6 py-4 w-32 text-right">Quantity</th>
-                       <th className="px-6 py-4 w-24">Unit</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-800">
-                     {boq.map((item, idx) => (
-                       <tr key={idx} className="hover:bg-slate-800/50 transition-colors group">
-                         <td className="px-6 py-4 font-mono text-amber-500 text-sm group-hover:text-amber-400">{item.code}</td>
-                         <td className="px-6 py-4 text-slate-300 group-hover:text-slate-200">{item.description}</td>
-                         <td className="px-6 py-4 text-right font-bold text-white text-lg">{item.quantity}</td>
-                         <td className="px-6 py-4 text-slate-500 text-sm">{item.unit}</td>
-                       </tr>
-                     ))}
-                   </tbody>
-                   <tfoot className="bg-slate-950/30 border-t border-slate-800">
-                     <tr>
-                       <td colSpan={4} className="px-6 py-3 text-right text-xs text-slate-600 italic">
-                         Generated automatically by ConstructOS SMM7 Engine
-                       </td>
-                     </tr>
-                   </tfoot>
-                 </table>
-               </div>
-             </div>
-           ) : (
-             <div className="h-full flex flex-col items-center justify-center text-slate-600">
-               <div className="w-24 h-24 mb-6 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center">
-                 <svg className="w-10 h-10 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-               </div>
-               <p className="text-lg font-medium text-slate-500">Ready to Calculate</p>
-               <p className="text-sm">Enter dimensions or import data to begin.</p>
-             </div>
-           )}
-        </div>
+        {/* ---------------- results */}
+        <main className="flex-1 min-w-0 overflow-auto p-6" style={{ background: UI.bg }}>
+          {boq.length > 0 ? (
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold" style={{ color: '#e6e9ed' }}>Bill of quantities</h2>
+                <Tag tone="ok">SMM7</Tag>
+              </div>
+              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b">
+                    <tr>
+                      <th className="px-3 py-2 w-24 font-medium">Ref</th>
+                      <th className="px-3 py-2 font-medium">Description</th>
+                      <th className="px-3 py-2 w-28 text-right font-medium">Quantity</th>
+                      <th className="px-3 py-2 w-16 font-medium">Unit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {boq.map((item, idx) => (
+                      <tr key={idx} style={{ borderColor: UI.rule }} className="border-b last:border-b-0 hover:bg-white/[0.03]">
+                        <td className="px-3 py-2.5" style={{ fontFamily: MONO, color: UI.warn }}>{item.code}</td>
+                        <td className="px-3 py-2.5">{item.description}</td>
+                        <td className="px-3 py-2.5 text-right" style={{ fontFamily: MONO, color: '#e6e9ed' }}>{item.quantity}</td>
+                        <td className="px-3 py-2.5" style={{ color: UI.dim, fontFamily: MONO }}>{item.unit}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 text-[11px]" style={{ color: UI.dim }}>Generated by the ArchPro SMM7 engine · {boq.length} items</div>
+            </div>
+          ) : (
+            <div className="h-full grid place-items-center">
+              <div className="text-center">
+                <div style={{ color: UI.dim }} className="flex justify-center"><Icon n="measure" s={28} /></div>
+                <div className="mt-3 font-semibold" style={{ color: '#e6e9ed' }}>Ready to calculate</div>
+                <div className="mt-1 text-xs" style={{ color: UI.dim }}>Enter dimensions or use drafting data, then generate the bill of quantities.</div>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
-    </div>
+    </Screen>
   );
 };
