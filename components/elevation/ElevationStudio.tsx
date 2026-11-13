@@ -1,6 +1,7 @@
 // components/elevation/ElevationStudio.tsx
 // Plan (image / PDF) -> calibrate -> trace external walls -> place windows & doors
 // -> black-and-white FRONT / REAR / LEFT / RIGHT elevations on an A3 sheet.
+// UI matches the Drafting Studio: title bar, tool palette, canvas, properties panel, status bar.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlanViewport } from './PlanViewport';
@@ -26,7 +27,46 @@ export interface ElevationStudioProps {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// colours used for drawing on the plan (overlay)
 const C = { wall: '#e11d48', sel: '#f59e0b', win: '#2563eb', door: '#16a34a', cal: '#7c3aed' };
+
+// interface palette (same tokens as the Drafting Studio)
+const UI = { bg: '#15171a', panel: '#1f2227', rule: '#2e333a', text: '#c9cfd6', dim: '#7d8590', accent: '#4aa3ff', grid: '#e5484d', door: '#f5b83d', win: '#3ddbd9' };
+const MONO = 'ui-monospace, "JetBrains Mono", Consolas, monospace';
+
+const ICONS: Record<string, string> = {
+  calibrate: 'M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2',
+  select: 'M5 3l14 8-6 2-2 6z',
+  pan: 'M8 13V5a1.5 1.5 0 013 0v6m0-7a1.5 1.5 0 013 0v7m0-5a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a6 6 0 01-5-3l-3-5a1.5 1.5 0 012-2l2 2',
+  wall: 'M4 20L20 4',
+  rect: 'M5 6h14v12H5z',
+  door: 'M5 19V5h9M5 19h14M14 5a14 14 0 015 14',
+  window: 'M4 9h16v6H4zM12 9v6',
+  undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3',
+  trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
+  upload: 'M12 16V4m0 0l-4 4m4-4l4 4M4 20h16',
+};
+
+const PALETTE: Record<Step, { id: Tool; icon: string; label: string; key: string }[]> = {
+  1: [
+    { id: 'calibrate', icon: 'calibrate', label: 'Set scale', key: 'C' },
+    { id: 'pan', icon: 'pan', label: 'Pan', key: 'H' },
+  ],
+  2: [
+    { id: 'trace', icon: 'wall', label: 'Trace walls', key: 'W' },
+    { id: 'rect', icon: 'rect', label: 'Rectangle', key: 'R' },
+    { id: 'select', icon: 'select', label: 'Select', key: 'V' },
+    { id: 'pan', icon: 'pan', label: 'Pan', key: 'H' },
+  ],
+  3: [
+    { id: 'addWindow', icon: 'window', label: 'Add window', key: 'N' },
+    { id: 'addDoor', icon: 'door', label: 'Add door', key: 'D' },
+    { id: 'select', icon: 'select', label: 'Select / drag along wall', key: 'V' },
+    { id: 'pan', icon: 'pan', label: 'Pan', key: 'H' },
+  ],
+  4: [],
+};
 
 function projectOnWall(p: Pt, w: ExtWall) {
   const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
@@ -38,18 +78,42 @@ function projectOnWall(p: Pt, w: ExtWall) {
 
 const SIDE_LABEL: Record<PlanSide, string> = { top: 'Top of plan', bottom: 'Bottom of plan', left: 'Left of plan', right: 'Right of plan' };
 
+// ---------- shared UI pieces (module level so inputs never remount) ----------
+const inputCls = 'w-full bg-[#15171a] border border-[#2e333a] rounded-[3px] px-2 py-1.5 text-xs text-[#c9cfd6] font-mono focus:outline-none focus:border-[#4aa3ff]';
+const btnGhost = 'px-3 py-1.5 text-xs border border-[#2e333a] rounded-[3px] hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed';
+const btnPrimary = 'px-3 py-1.5 text-xs rounded-[3px] font-medium bg-[#4aa3ff] text-[#06121f] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed';
+const btnDanger = 'px-3 py-1.5 text-xs border border-[#e5484d] text-[#e5484d] rounded-[3px] hover:bg-[#e5484d]/10 disabled:opacity-40 disabled:cursor-not-allowed';
+const boxCls = 'border border-[#2e333a] rounded-[3px] p-3 bg-[#181a1e]';
+const errCls = 'text-xs text-[#ff9ea1] bg-[#e5484d]/10 border border-[#e5484d]/50 rounded-[3px] p-2';
+const warnCls = 'text-xs text-[#f5b83d] bg-[#f5b83d]/10 border border-[#f5b83d]/40 rounded-[3px] p-2';
+
+const Icon = ({ n, s = 18 }: { n: string; s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS[n]} /></svg>
+);
+const PaletteBtn = ({ on, onClick, title, disabled, children }: { on?: boolean; onClick: () => void; title: string; disabled?: boolean; children: React.ReactNode }) => (
+  <button title={title} onClick={onClick} disabled={disabled} style={{ background: on ? UI.accent : 'transparent', color: on ? '#06121f' : UI.text }}
+    className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline outline-2 outline-offset-1">{children}</button>
+);
+const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div style={{ borderColor: UI.rule }} className="border-b px-3 py-3 space-y-2">
+    <div className="text-xs font-semibold" style={{ color: UI.text }}>{title}</div>
+    {children}
+  </div>
+);
 const Field: React.FC<{ label: string; children: React.ReactNode; hint?: string }> = ({ label, children, hint }) => (
   <label className="block">
-    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</span>
+    <span className="text-xs" style={{ color: UI.dim }}>{label}</span>
     <div className="mt-1">{children}</div>
-    {hint && <span className="text-[10px] text-slate-500">{hint}</span>}
+    {hint && <span className="text-[10px]" style={{ color: UI.dim }}>{hint}</span>}
   </label>
 );
-const inputCls = 'w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-blue-400';
+const Check: React.FC<{ checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }> = ({ checked, onChange, children }) => (
+  <label className="flex items-center gap-2 py-0.5 text-xs cursor-pointer"><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />{children}</label>
+);
 
 export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initial }) => {
   // ---------------------------------------------------------------- state
-  const [step, setStep] = useState<Step>(initial?.plan ? 1 : 1);
+  const [step, setStep] = useState<Step>(1);
   const [tool, setTool] = useState<Tool>('calibrate');
   const [plan, setPlan] = useState<PlanSource | null>(initial?.plan ?? null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -107,6 +171,8 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
     setTool(s === 1 ? 'calibrate' : s === 2 ? 'trace' : s === 3 ? 'select' : 'pan');
   };
 
+  const pickTool = (id: Tool) => { setTool(id); setChain(null); setRectDrag(null); };
+
   // --------------------------------------------------------------- loading
   const loadFile = async (file: File, page = 1) => {
     setLoading(true); setLoadErr(null);
@@ -138,6 +204,10 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
         if (selWall) deleteWall(selWall);
         else if (selOpening) deleteOpening(selOpening);
       }
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        const hot = PALETTE[step].find(p => p.key === e.key.toUpperCase());
+        if (hot) pickTool(hot.id);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -146,6 +216,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
   // --------------------------------------------------------------- walls
   const deleteWall = (id: string) => { mutate(d => ({ walls: d.walls.filter(w => w.id !== id), openings: d.openings.filter(o => o.wallId !== id) })); setSelWall(null); };
   const deleteOpening = (id: string) => { mutate(d => ({ ...d, openings: d.openings.filter(o => o.id !== id) })); setSelOpening(null); };
+  const deleteSelected = () => { if (selWall) deleteWall(selWall); else if (selOpening) deleteOpening(selOpening); };
   const addWalls = (segs: [Pt, Pt][]) => mutate(d => ({
     ...d, walls: [...d.walls, ...segs.map(([a, b]) => ({ id: uid(), x1: a.x, y1: a.y, x2: b.x, y2: b.y }))],
   }));
@@ -301,8 +372,8 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
   const patchOpening = (id: string, p: Partial<Opening>) => mutate(d => ({ ...d, openings: d.openings.map(o => (o.id === id ? { ...o, ...p } : o)) }));
   const duplicateOpening = (o: Opening) => {
     const w = wallById.get(o.wallId); if (!w) return;
-    const step = (o.width + 300) / wallLenMm(w);
-    const t = o.t + step <= 1 - o.width / 2 / wallLenMm(w) ? o.t + step : o.t - step;
+    const gap = (o.width + 300) / wallLenMm(w);
+    const t = o.t + gap <= 1 - o.width / 2 / wallLenMm(w) ? o.t + gap : o.t - gap;
     const n: Opening = { ...o, id: uid(), t: clampT(t, o.width, w) };
     mutate(d => ({ ...d, openings: [...d.openings, n] })); setSelOpening(n.id);
   };
@@ -441,154 +512,207 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
     );
   };
 
-  // --------------------------------------------------------------- tool buttons
-  const ToolBtn: React.FC<{ id: Tool; icon: string; label: string; onPick?: () => void }> = ({ id, icon, label, onPick }) => (
-    <button onClick={() => { setTool(id); setChain(null); setRectDrag(null); onPick?.(); }}
-      className={`tool-btn w-full px-3 py-2 rounded flex items-center gap-2 text-sm ${tool === id ? 'active' : 'bg-slate-800'}`}>
-      <span>{icon}</span>{label}
-    </button>
-  );
-
   const perimeterM = doc.walls.reduce((s, w) => s + wallLenMm(w), 0) / 1000;
   const levelOptions = [{ v: 'all', l: 'Every floor' }, ...Array.from({ length: specs.floors }, (_, i) => ({ v: String(i), l: i === 0 ? 'Ground floor only' : `Floor ${i} only` }))];
   const cursorFor = tool === 'pan' ? 'grab' : tool === 'select' ? 'default' : 'crosshair';
+  const stepTitles: Record<Step, string> = { 1: 'Plan & scale', 2: 'External walls', 3: 'Windows & doors', 4: 'Elevations' };
+  const nextLabel = step === 1 ? 'Next: external walls' : step === 2 ? 'Next: windows & doors' : 'Generate elevations';
+
+  const hint =
+    step === 1 ? (cal ? 'Scale set. Continue, or click two new points to change it.' : calPts.length === 0 ? 'Click the first end of a known dimension' : calPts.length === 1 ? 'Click the second end' : 'Enter the real length in the panel')
+    : step === 2 ? (tool === 'trace' ? (chain ? 'Pick next corner, double-click or Enter to finish' : 'Pick the first corner of the external wall') : tool === 'rect' ? 'Drag from one corner to the opposite corner' : tool === 'select' ? 'Click a wall to select it. Del removes it' : 'Drag to pan')
+    : step === 3 ? (tool === 'addWindow' ? 'Click on a wall to place a window' : tool === 'addDoor' ? 'Click on a wall to place a door' : tool === 'select' ? 'Click an opening to edit, drag it along its wall' : 'Drag to pan')
+    : '';
 
   // ================================================================= render
-  const stepTitles: Record<Step, string> = { 1: 'Plan & scale', 2: 'External walls', 3: 'Windows & doors', 4: 'Elevations' };
-
   return (
-    <div className="flex h-screen w-full text-slate-200 overflow-hidden font-sans">
-      {/* ------------------------------------------------ sidebar */}
-      <aside className="w-96 shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col z-20">
-        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-          <div>
-            <h1 className="font-bold text-lg text-white leading-tight">Elevation Studio</h1>
-            <p className="text-[11px] text-slate-400">Plan → front, rear &amp; side elevations (black &amp; white)</p>
-          </div>
-          <button onClick={onClose} className="text-xs text-slate-400 hover:text-white">Exit</button>
-        </div>
+    <div className="h-screen w-full flex flex-col select-none" style={{ background: UI.bg, color: UI.text, fontFamily: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif', fontSize: 13 }}>
+      {/* ---------------- title bar */}
+      <header style={{ background: UI.panel, borderColor: UI.rule }} className="h-11 flex items-center gap-3 px-3 border-b shrink-0">
+        <button onClick={onClose} className="font-semibold tracking-tight hover:text-white" title="Back to dashboard">ArchPro</button>
+        <span style={{ color: UI.dim }}>/ Elevation studio</span>
 
-        <div className="px-4 pt-3 pb-2 border-b border-slate-800 grid grid-cols-4 gap-1">
+        <nav className="flex items-center gap-1 ml-4">
           {([1, 2, 3, 4] as Step[]).map(s => (
             <button key={s} onClick={() => goStep(s)} disabled={!canGo(s)}
-              className={`text-[10px] leading-tight py-2 px-1 rounded border ${step === s ? 'bg-blue-600 border-blue-400 text-white' : canGo(s) ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'}`}>
-              <div className="font-bold text-sm">{s}</div>{stepTitles[s]}
+              className={`px-2.5 py-1 text-xs rounded-[3px] ${step === s ? 'bg-[#4aa3ff] text-[#06121f] font-medium' : canGo(s) ? 'hover:bg-white/5' : 'cursor-not-allowed'}`}
+              style={step !== s && !canGo(s) ? { color: UI.dim, opacity: 0.5 } : undefined}>
+              {s}  {stepTitles[s]}
             </button>
           ))}
-        </div>
+        </nav>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-5">
-          {/* ---------------- STEP 1 */}
+        <div className="flex-1" />
+        <button disabled={step === 1} onClick={() => goStep((step - 1) as Step)} className={btnGhost}>Back</button>
+        {step < 4 ? (
+          <button disabled={!canGo((step + 1) as Step)} onClick={() => goStep((step + 1) as Step)} className={btnPrimary}>{nextLabel}</button>
+        ) : (
+          <>
+            <button onClick={exportSVG} disabled={!result?.sheet} className={btnGhost}>SVG</button>
+            <button onClick={printSheet} disabled={!result?.sheet} className={btnGhost}>Print / PDF</button>
+            <button onClick={exportPNG} disabled={!result?.sheet || busy} className={btnPrimary}>{busy ? 'Exporting…' : 'Download PNG'}</button>
+          </>
+        )}
+      </header>
+
+      <div className="flex-1 flex min-h-0">
+        {/* ---------------- tool palette */}
+        {step !== 4 && (
+          <nav style={{ background: UI.panel, borderColor: UI.rule }} className="w-12 border-r flex flex-col items-center py-2 gap-1 shrink-0">
+            {PALETTE[step].map(t => (
+              <PaletteBtn key={t.id} on={tool === t.id} title={`${t.label} (${t.key})`} onClick={() => pickTool(t.id)}><Icon n={t.icon} /></PaletteBtn>
+            ))}
+            {step > 1 && (
+              <>
+                <div style={{ background: UI.rule }} className="w-6 h-px my-1" />
+                <PaletteBtn title="Undo (Ctrl+Z)" onClick={undo}><Icon n="undo" /></PaletteBtn>
+                <PaletteBtn title="Delete selected (Del)" onClick={deleteSelected} disabled={!selWall && !selOpening}><Icon n="trash" /></PaletteBtn>
+              </>
+            )}
+          </nav>
+        )}
+
+        {/* ---------------- workspace */}
+        <main className="flex-1 relative min-w-0" style={{ background: UI.bg }}>
+          {step === 4 ? (
+            <div className="absolute inset-0 overflow-auto p-6 flex justify-center items-start">
+              {result?.error ? (
+                <div style={{ background: UI.panel, borderColor: UI.rule }} className="mt-20 max-w-md text-center border rounded-[3px] p-6">
+                  <div className="font-semibold mb-1">Can’t draw the elevations yet</div>
+                  <div className="text-xs" style={{ color: UI.dim }}>{result.error}</div>
+                </div>
+              ) : (
+                <div className="sheet-preview w-full max-w-[1400px]" dangerouslySetInnerHTML={{ __html: svgPreview }} />
+              )}
+            </div>
+          ) : plan ? (
+            <PlanViewport
+              src={plan.src} width={plan.width} height={plan.height}
+              panTool={tool === 'pan'} cursor={cursorFor}
+              onHover={onHover} onLeave={() => { setHover(null); setGhost(null); }}
+              onClickPt={onClickPt} onDoubleClickPt={onDoubleClickPt}
+              onDragStart={onDragStart} onDrag={onDrag} onDragEnd={onDragEnd}
+              overlay={overlay}
+            >
+              <div style={{ background: 'rgba(31,34,39,.9)', borderColor: UI.rule, fontFamily: MONO }} className="absolute left-3 top-3 z-10 px-2.5 py-1.5 border rounded-[3px] text-xs pointer-events-none">{hint}</div>
+            </PlanViewport>
+          ) : (
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="text-center max-w-sm">
+                <div className="flex justify-center mb-3" style={{ color: UI.dim }}><Icon n="upload" s={28} /></div>
+                <div className="font-semibold mb-1">Start with a floor plan</div>
+                <div className="text-xs" style={{ color: UI.dim }}>Upload an image or PDF of the ground-floor plan in the panel on the right. You’ll set the scale, pick the external walls, then add windows and doors.</div>
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* ---------------- properties panel */}
+        <aside style={{ background: UI.panel, borderColor: UI.rule }} className="w-80 border-l overflow-y-auto shrink-0">
+          {/* ---- step 1 */}
           {step === 1 && (
             <>
-              <div className="relative p-5 border-2 border-dashed border-slate-600 rounded-xl text-center hover:bg-slate-800 transition-colors"
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) loadFile(f); }}>
-                <input type="file" accept="image/*,application/pdf,.pdf" className="absolute inset-0 opacity-0 cursor-pointer"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) loadFile(f); e.target.value = ''; }} />
-                <div className="text-3xl mb-1">📐</div>
-                <div className="font-bold text-white text-sm">{plan ? 'Replace floor plan' : 'Upload floor plan'}</div>
-                <div className="text-xs text-slate-400">Image (PNG, JPG) or PDF · drag &amp; drop works too</div>
-                {loading && <div className="mt-2 text-xs text-blue-300 animate-pulse">Reading file…</div>}
-              </div>
-              {loadErr && <div className="text-xs text-red-300 bg-red-950/50 border border-red-800 rounded p-2">{loadErr}</div>}
-              {plan && <div className="text-[11px] text-slate-400 break-all">Loaded: {plan.name} ({plan.width}×{plan.height}px)</div>}
-
-              {pdfPages.n > 1 && fileRef.current && (
-                <Field label="PDF page" hint="Pick the page that holds the floor plan (this clears your tracing).">
-                  <select className={inputCls} value={pdfPages.page} onChange={e => loadFile(fileRef.current!, Number(e.target.value))}>
-                    {Array.from({ length: pdfPages.n }, (_, i) => <option key={i} value={i + 1}>Page {i + 1}</option>)}
-                  </select>
-                </Field>
-              )}
+              <Section title="Floor plan">
+                <div className="relative p-4 border border-dashed rounded-[3px] text-center hover:border-[#4aa3ff]" style={{ borderColor: UI.rule }}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) loadFile(f); }}>
+                  <input type="file" accept="image/*,application/pdf,.pdf" className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) loadFile(f); e.target.value = ''; }} />
+                  <div className="flex justify-center mb-1" style={{ color: UI.dim }}><Icon n="upload" s={22} /></div>
+                  <div className="font-semibold">{plan ? 'Replace floor plan' : 'Open floor plan'}</div>
+                  <div className="text-xs" style={{ color: UI.dim }}>PNG, JPG or PDF. Drag and drop works too.</div>
+                  {loading && <div className="mt-2 text-xs animate-pulse" style={{ color: UI.accent }}>Reading file…</div>}
+                </div>
+                {loadErr && <div className={errCls}>{loadErr}</div>}
+                {plan && <div className="text-xs break-all font-mono" style={{ color: UI.dim }}>{plan.name} ({plan.width}×{plan.height} px)</div>}
+                {pdfPages.n > 1 && fileRef.current && (
+                  <Field label="PDF page" hint="Pick the page that holds the floor plan. This clears your tracing.">
+                    <select className={inputCls} value={pdfPages.page} onChange={e => loadFile(fileRef.current!, Number(e.target.value))}>
+                      {Array.from({ length: pdfPages.n }, (_, i) => <option key={i} value={i + 1}>Page {i + 1}</option>)}
+                    </select>
+                  </Field>
+                )}
+              </Section>
 
               {plan && (
-                <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-3">
-                  <h3 className="text-xs font-bold text-violet-300 uppercase">Set the scale</h3>
-                  <p className="text-xs text-slate-400">Click two points on a dimension you know (e.g. the two ends of a wall that is dimensioned on the plan), then enter its real length.</p>
-                  <div className="text-xs">
-                    {calPts.length < 2 ? <span className="text-slate-300">Click point {calPts.length + 1} of 2…</span> : <span className="text-emerald-300">Points set ({Math.round(calPixels)} px apart)</span>}
+                <Section title="Set the scale">
+                  <p className="text-xs" style={{ color: UI.dim }}>Click two points on a dimension you know (for example the two ends of a dimensioned wall), then enter its real length.</p>
+                  <div className="text-xs font-mono">
+                    {calPts.length < 2 ? <span>Click point {calPts.length + 1} of 2…</span> : <span style={{ color: UI.win }}>Points set ({Math.round(calPixels)} px apart)</span>}
                   </div>
                   {calPts.length === 2 && (
                     <div className="flex gap-2">
                       <input className={inputCls} type="number" min={0} placeholder="Real length" value={calText} onChange={e => setCalText(e.target.value)} />
-                      <select className="bg-slate-900 border border-slate-600 rounded px-2 text-sm" value={calUnit} onChange={e => setCalUnit(e.target.value as 'mm' | 'm')}><option>mm</option><option>m</option></select>
-                      <button onClick={applyCal} className="px-3 rounded bg-violet-600 hover:bg-violet-500 text-sm font-bold">Set</button>
+                      <select className="w-16 bg-[#15171a] border border-[#2e333a] rounded-[3px] px-1.5 text-xs font-mono text-[#c9cfd6]" value={calUnit} onChange={e => setCalUnit(e.target.value as 'mm' | 'm')}><option>mm</option><option>m</option></select>
+                      <button onClick={applyCal} className={btnPrimary}>Set</button>
                     </div>
                   )}
-                  {cal && <div className="text-xs text-emerald-300">✓ Scale set: 1 px = {cal.mmPerPx.toFixed(2)} mm</div>}
-                  {(calPts.length > 0) && <button onClick={() => setCalPts([])} className="text-xs text-slate-400 hover:text-white underline">Start over</button>}
-                </div>
+                  {cal && <div className="text-xs font-mono" style={{ color: UI.win }}>Scale set: 1 px = {cal.mmPerPx.toFixed(2)} mm</div>}
+                  {calPts.length > 0 && <button onClick={() => setCalPts([])} className="text-xs underline hover:text-white" style={{ color: UI.dim }}>Start over</button>}
+                </Section>
               )}
             </>
           )}
 
-          {/* ---------------- STEP 2 */}
+          {/* ---- step 2 */}
           {step === 2 && (
             <>
-              <div className="space-y-2">
-                <h3 className="text-xs font-bold text-slate-500 uppercase">Select the building's external walls</h3>
-                <p className="text-xs text-slate-400">Follow the <b>outer face</b> of the walls. Click each corner in turn; click the first corner again (or double-click / Enter) to finish.</p>
-                <ToolBtn id="trace" icon="✏️" label="Trace walls (click corners)" />
-                <ToolBtn id="rect" icon="⬜" label="Rectangle (drag diagonal)" />
-                <ToolBtn id="select" icon="🖱️" label="Select / delete a wall" />
-                <ToolBtn id="pan" icon="✋" label="Pan" />
-              </div>
-              <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-2 text-sm">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={ortho} onChange={e => setOrtho(e.target.checked)} /> Keep walls horizontal / vertical</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={snapPts} onChange={e => setSnapPts(e.target.checked)} /> Snap to wall corners</label>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={undo} className="flex-1 py-2 text-sm rounded bg-slate-800 border border-slate-600 hover:bg-slate-700">↶ Undo</button>
-                <button onClick={() => setChain(null)} disabled={!chain} className="flex-1 py-2 text-sm rounded bg-slate-800 border border-slate-600 hover:bg-slate-700 disabled:opacity-40">Finish line</button>
-                <button onClick={() => { if (confirm('Remove all traced walls and openings?')) mutate(() => ({ walls: [], openings: [] })); }} className="flex-1 py-2 text-sm rounded bg-slate-800 border border-red-900 text-red-300 hover:bg-red-950">Clear</button>
-              </div>
-              {selWall && <button onClick={() => deleteWall(selWall)} className="w-full py-2 text-sm rounded bg-red-600/80 hover:bg-red-600 font-bold">Delete selected wall</button>}
-              <div className="text-xs text-slate-400">{doc.walls.length} wall segment{doc.walls.length === 1 ? '' : 's'} · perimeter {perimeterM.toFixed(2)} m{doc.walls.length < 3 && ' · need at least 3'}</div>
+              <Section title="External walls">
+                <p className="text-xs" style={{ color: UI.dim }}>Follow the <b style={{ color: UI.text }}>outer face</b> of the walls. Click each corner in turn. Click the first corner again, double-click or press Enter to finish.</p>
+              </Section>
+              <Section title="Drawing aids">
+                <Check checked={ortho} onChange={setOrtho}>Keep walls horizontal / vertical</Check>
+                <Check checked={snapPts} onChange={setSnapPts}>Snap to wall corners</Check>
+              </Section>
+              <Section title="Walls">
+                <div className="text-xs font-mono" style={{ color: UI.dim }}>{doc.walls.length} segment{doc.walls.length === 1 ? '' : 's'}, perimeter {perimeterM.toFixed(2)} m{doc.walls.length < 3 && ', need at least 3'}</div>
+                <div className="flex gap-2">
+                  <button onClick={undo} className={`${btnGhost} flex-1`}>Undo</button>
+                  <button onClick={() => setChain(null)} disabled={!chain} className={`${btnGhost} flex-1`}>Finish line</button>
+                  <button onClick={() => { if (confirm('Remove all traced walls and openings?')) mutate(() => ({ walls: [], openings: [] })); }} className={`${btnDanger} flex-1`}>Clear</button>
+                </div>
+                {selWall && <button onClick={() => deleteWall(selWall)} className={`${btnDanger} w-full`}>Delete selected wall</button>}
+              </Section>
             </>
           )}
 
-          {/* ---------------- STEP 3 */}
+          {/* ---- step 3 */}
           {step === 3 && (
             <>
-              <div className="space-y-2">
-                <h3 className="text-xs font-bold text-slate-500 uppercase">Place on the external walls</h3>
-                <ToolBtn id="addWindow" icon="🪟" label="Add window" />
-                <ToolBtn id="addDoor" icon="🚪" label="Add door" />
-                <ToolBtn id="select" icon="🖱️" label="Select / drag along wall" />
-                <ToolBtn id="pan" icon="✋" label="Pan" />
-              </div>
-
-              {!selected && (tool === 'addWindow' || tool === 'addDoor') && (
-                <div className="space-y-2">
-                  <h3 className="text-xs font-bold text-slate-500 uppercase">{tool === 'addWindow' ? 'Window style' : 'Door style'}</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(tool === 'addWindow' ? WINDOW_STYLES : DOOR_STYLES).map(s => {
-                      const kind: OpeningKind = tool === 'addWindow' ? 'window' : 'door';
-                      const on = nextStyle[kind] === s.id;
-                      return (
-                        <button key={s.id} onClick={() => setNextStyle(n => ({ ...n, [kind]: s.id }))}
-                          className={`rounded border p-1 text-[10px] leading-tight ${on ? 'border-blue-400 bg-blue-950' : 'border-slate-700 bg-slate-800 hover:bg-slate-700'}`}>
-                          <OpeningThumb kind={kind} style={s.id} className="w-full h-16 rounded bg-white" />
-                          <div className="mt-1">{s.label}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-slate-400">Hover a wall and click to drop it in. You can fine-tune size and height afterwards.</p>
-                </div>
+              {!selected && (
+                <Section title={tool === 'addWindow' ? 'Window style' : tool === 'addDoor' ? 'Door style' : 'Windows and doors'}>
+                  {(tool === 'addWindow' || tool === 'addDoor') ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(tool === 'addWindow' ? WINDOW_STYLES : DOOR_STYLES).map(s => {
+                          const kind: OpeningKind = tool === 'addWindow' ? 'window' : 'door';
+                          const on = nextStyle[kind] === s.id;
+                          return (
+                            <button key={s.id} onClick={() => setNextStyle(n => ({ ...n, [kind]: s.id }))}
+                              className={`rounded-[3px] border p-1 text-[10px] leading-tight ${on ? 'border-[#4aa3ff] bg-[#4aa3ff]/10' : 'border-[#2e333a] hover:bg-white/5'}`}>
+                              <OpeningThumb kind={kind} style={s.id} className="w-full h-16 rounded bg-white" />
+                              <div className="mt-1">{s.label}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs" style={{ color: UI.dim }}>Hover a wall and click to drop it in. Fine-tune size and height afterwards.</p>
+                    </>
+                  ) : (
+                    <p className="text-xs" style={{ color: UI.dim }}>Pick Add window (N) or Add door (D) in the tool palette, then click on an external wall. Use Select (V) to edit or drag an opening along its wall.</p>
+                  )}
+                </Section>
               )}
 
               {selected && (
-                <div className="bg-slate-800 border border-amber-500/60 rounded-lg p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-amber-300">{marks.tagOf(selected)} · {selected.kind === 'window' ? 'Window' : 'Door'}</h3>
-                    <button onClick={() => setSelOpening(null)} className="text-xs text-slate-400 hover:text-white">Done</button>
+                <Section title={`${marks.tagOf(selected)}, ${selected.kind === 'window' ? 'window' : 'door'}`}>
+                  <div className="flex justify-end -mt-6">
+                    <button onClick={() => setSelOpening(null)} className="text-xs hover:text-white" style={{ color: UI.dim }}>Done</button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {(selected.kind === 'window' ? WINDOW_STYLES : DOOR_STYLES).map(s => (
                       <button key={s.id} onClick={() => patchOpening(selected.id, { style: s.id })}
-                        className={`rounded border p-1 text-[10px] leading-tight ${selected.style === s.id ? 'border-blue-400 bg-blue-950' : 'border-slate-700 bg-slate-900 hover:bg-slate-700'}`}>
+                        className={`rounded-[3px] border p-1 text-[10px] leading-tight ${selected.style === s.id ? 'border-[#4aa3ff] bg-[#4aa3ff]/10' : 'border-[#2e333a] hover:bg-white/5'}`}>
                         <OpeningThumb kind={selected.kind} style={s.id} hinge={selected.hinge} className="w-full h-14 rounded bg-white" />
                         <div className="mt-1">{s.label}</div>
                       </button>
@@ -608,160 +732,125 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
                     <input type="range" min={0} max={100} value={Math.round(selected.t * 100)} className="w-full"
                       onChange={e => { const w = wallById.get(selected.wallId); if (w) patchOpening(selected.id, { t: clampT(Number(e.target.value) / 100, selected.width, w) }); }} />
                   </Field>
-                  <div className="flex gap-2 text-xs">
-                    <button onClick={() => { const w = wallById.get(selected.wallId); if (w) patchOpening(selected.id, { t: clampT(0.5, selected.width, w) }); }} className="flex-1 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Centre on wall</button>
-                    <button onClick={() => patchOpening(selected.id, { hinge: selected.hinge === 'left' ? 'right' : 'left' })} className="flex-1 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Flip hinge</button>
+                  <div className="flex gap-2">
+                    <button onClick={() => { const w = wallById.get(selected.wallId); if (w) patchOpening(selected.id, { t: clampT(0.5, selected.width, w) }); }} className={`${btnGhost} flex-1`}>Centre on wall</button>
+                    <button onClick={() => patchOpening(selected.id, { hinge: selected.hinge === 'left' ? 'right' : 'left' })} className={`${btnGhost} flex-1`}>Flip hinge</button>
                   </div>
-                  <div className="flex gap-2 text-xs">
-                    <button onClick={() => duplicateOpening(selected)} className="flex-1 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Duplicate</button>
-                    <button onClick={() => deleteOpening(selected.id)} className="flex-1 py-1.5 rounded bg-red-600/80 hover:bg-red-600 font-bold">Delete</button>
+                  <div className="flex gap-2">
+                    <button onClick={() => duplicateOpening(selected)} className={`${btnGhost} flex-1`}>Duplicate</button>
+                    <button onClick={() => deleteOpening(selected.id)} className={`${btnDanger} flex-1`}>Delete</button>
                   </div>
                   {(selected.kind === 'window' ? selected.sill : 0) + selected.height > specs.floorHeight - 100 && (
-                    <div className="text-[11px] text-amber-300">Taller than the storey height set in Step 4 ({specs.floorHeight} mm) – it will be trimmed.</div>
+                    <div className={warnCls}>Taller than the storey height set in Step 4 ({specs.floorHeight} mm). It will be trimmed.</div>
                   )}
-                </div>
+                </Section>
               )}
 
-              <div>
-                <h3 className="text-xs font-bold text-slate-500 uppercase mb-1">Openings ({doc.openings.length})</h3>
-                <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {doc.openings.length === 0 && <div className="text-xs text-slate-500">None yet.</div>}
+              <Section title={`Openings (${doc.openings.length})`}>
+                <div className="space-y-1 max-h-64 overflow-y-auto">
+                  {doc.openings.length === 0 && <div className="text-xs" style={{ color: UI.dim }}>None yet.</div>}
                   {doc.openings.map(o => (
-                    <button key={o.id} onClick={() => { setSelOpening(o.id); setTool('select'); }}
-                      className={`w-full text-left text-xs px-2 py-1.5 rounded border ${o.id === selOpening ? 'border-amber-400 bg-slate-800' : 'border-slate-800 bg-slate-800/60 hover:bg-slate-800'}`}>
-                      <b>{marks.tagOf(o)}</b> · {o.width}×{o.height}{o.kind === 'window' ? ` · sill ${o.sill}` : ''} · {o.level === 'all' ? 'all floors' : o.level === 0 ? 'ground' : `floor ${o.level}`}
+                    <button key={o.id} onClick={() => { setSelOpening(o.id); pickTool('select'); }}
+                      className={`w-full text-left text-xs px-2 py-1.5 rounded-[3px] border font-mono ${o.id === selOpening ? 'border-[#f5b83d]' : 'border-[#2e333a] hover:bg-white/5'}`}>
+                      <b>{marks.tagOf(o)}</b> {o.width}×{o.height}{o.kind === 'window' ? `, sill ${o.sill}` : ''}, {o.level === 'all' ? 'all floors' : o.level === 0 ? 'ground' : `floor ${o.level}`}
                     </button>
                   ))}
                 </div>
-              </div>
-              <button onClick={undo} className="w-full py-2 text-sm rounded bg-slate-800 border border-slate-600 hover:bg-slate-700">↶ Undo</button>
+              </Section>
             </>
           )}
 
-          {/* ---------------- STEP 4 */}
+          {/* ---- step 4 */}
           {step === 4 && (
             <>
-              <Field label="Project name"><input className={inputCls} value={specs.projectName} onChange={e => patchSpecs({ projectName: e.target.value })} /></Field>
+              {exportErr && <div className="px-3 pt-3"><div className={errCls}>{exportErr}</div></div>}
 
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Floors"><input className={inputCls} type="number" min={1} max={6} value={specs.floors} onChange={e => patchSpecs({ floors: Math.min(6, Math.max(1, Number(e.target.value) || 1)) })} /></Field>
-                <Field label="Floor-to-floor (mm)"><input className={inputCls} type="number" min={2200} step={50} value={specs.floorHeight} onChange={e => patchSpecs({ floorHeight: Math.max(2200, Number(e.target.value) || 3000) })} /></Field>
-                <Field label="Plinth height (mm)" hint="ground → ground-floor level"><input className={inputCls} type="number" min={0} step={50} value={specs.plinthHeight} onChange={e => patchSpecs({ plinthHeight: Math.max(0, Number(e.target.value) || 0) })} /></Field>
-                <Field label="Eaves overhang (mm)"><input className={inputCls} type="number" min={0} step={50} value={specs.overhang} onChange={e => patchSpecs({ overhang: Math.max(0, Number(e.target.value) || 0) })} /></Field>
-              </div>
+              <Section title="Project">
+                <Field label="Project name"><input className={inputCls} value={specs.projectName} onChange={e => patchSpecs({ projectName: e.target.value })} /></Field>
+              </Section>
 
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Roof type">
-                  <select className={inputCls} value={specs.roofType} onChange={e => patchSpecs({ roofType: e.target.value as RoofType })}>
-                    <option value="gable">Gable</option><option value="hip">Hip</option><option value="shed">Mono-pitch (shed)</option><option value="flat">Flat + parapet</option>
-                  </select>
-                </Field>
-                {specs.roofType !== 'flat' && <Field label="Pitch (°)"><input className={inputCls} type="number" min={5} max={60} value={specs.roofPitch} onChange={e => patchSpecs({ roofPitch: Math.min(60, Math.max(5, Number(e.target.value) || 25)) })} /></Field>}
-                {specs.roofType === 'flat' && <Field label="Parapet (mm)"><input className={inputCls} type="number" min={0} step={50} value={specs.parapet} onChange={e => patchSpecs({ parapet: Math.max(0, Number(e.target.value) || 0) })} /></Field>}
-                {(specs.roofType === 'gable' || specs.roofType === 'hip') && (
-                  <Field label="Ridge runs">
-                    <select className={inputCls} value={specs.ridgeAxis} onChange={e => patchSpecs({ ridgeAxis: e.target.value as ElevationSpecs['ridgeAxis'] })}>
-                      <option value="auto">Along longest side</option><option value="x">Left ↔ right on plan</option><option value="y">Up ↕ down on plan</option>
+              <Section title="Storeys (mm)">
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Floors"><input className={inputCls} type="number" min={1} max={6} value={specs.floors} onChange={e => patchSpecs({ floors: Math.min(6, Math.max(1, Number(e.target.value) || 1)) })} /></Field>
+                  <Field label="Floor to floor"><input className={inputCls} type="number" min={2200} step={50} value={specs.floorHeight} onChange={e => patchSpecs({ floorHeight: Math.max(2200, Number(e.target.value) || 3000) })} /></Field>
+                  <Field label="Plinth height" hint="ground to ground-floor level"><input className={inputCls} type="number" min={0} step={50} value={specs.plinthHeight} onChange={e => patchSpecs({ plinthHeight: Math.max(0, Number(e.target.value) || 0) })} /></Field>
+                  <Field label="Eaves overhang"><input className={inputCls} type="number" min={0} step={50} value={specs.overhang} onChange={e => patchSpecs({ overhang: Math.max(0, Number(e.target.value) || 0) })} /></Field>
+                </div>
+              </Section>
+
+              <Section title="Roof">
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Roof type">
+                    <select className={inputCls} value={specs.roofType} onChange={e => patchSpecs({ roofType: e.target.value as RoofType })}>
+                      <option value="gable">Gable</option><option value="hip">Hip</option><option value="shed">Mono-pitch (shed)</option><option value="flat">Flat + parapet</option>
                     </select>
                   </Field>
-                )}
-                {specs.roofType === 'shed' && (
-                  <Field label="High side is">
-                    <select className={inputCls} value={specs.shedHigh} onChange={e => patchSpecs({ shedHigh: e.target.value as PlanSide })}>
-                      {(Object.keys(SIDE_LABEL) as PlanSide[]).map(s => <option key={s} value={s}>{SIDE_LABEL[s]}</option>)}
-                    </select>
-                  </Field>
-                )}
-              </div>
+                  {specs.roofType !== 'flat' && <Field label="Pitch (°)"><input className={inputCls} type="number" min={5} max={60} value={specs.roofPitch} onChange={e => patchSpecs({ roofPitch: Math.min(60, Math.max(5, Number(e.target.value) || 25)) })} /></Field>}
+                  {specs.roofType === 'flat' && <Field label="Parapet (mm)"><input className={inputCls} type="number" min={0} step={50} value={specs.parapet} onChange={e => patchSpecs({ parapet: Math.max(0, Number(e.target.value) || 0) })} /></Field>}
+                  {(specs.roofType === 'gable' || specs.roofType === 'hip') && (
+                    <Field label="Ridge runs">
+                      <select className={inputCls} value={specs.ridgeAxis} onChange={e => patchSpecs({ ridgeAxis: e.target.value as ElevationSpecs['ridgeAxis'] })}>
+                        <option value="auto">Along longest side</option><option value="x">Left ↔ right on plan</option><option value="y">Up ↕ down on plan</option>
+                      </select>
+                    </Field>
+                  )}
+                  {specs.roofType === 'shed' && (
+                    <Field label="High side is">
+                      <select className={inputCls} value={specs.shedHigh} onChange={e => patchSpecs({ shedHigh: e.target.value as PlanSide })}>
+                        {(Object.keys(SIDE_LABEL) as PlanSide[]).map(s => <option key={s} value={s}>{SIDE_LABEL[s]}</option>)}
+                      </select>
+                    </Field>
+                  )}
+                </div>
+              </Section>
 
-              <div className="space-y-1">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Front of the building is the…</span>
+              <Section title="Front of the building is the…">
                 <div className="grid grid-cols-4 gap-1">
                   {(['top', 'bottom', 'left', 'right'] as PlanSide[]).map(s => (
-                    <button key={s} onClick={() => patchSpecs({ frontSide: s })} className={`py-1.5 text-xs rounded border ${specs.frontSide === s ? 'bg-blue-600 border-blue-400' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>{s}</button>
+                    <button key={s} onClick={() => patchSpecs({ frontSide: s })}
+                      className={`py-1.5 text-xs rounded-[3px] border ${specs.frontSide === s ? 'bg-[#4aa3ff] border-[#4aa3ff] text-[#06121f] font-medium' : 'border-[#2e333a] hover:bg-white/5'}`}>{s}</button>
                   ))}
                 </div>
                 <MiniPlan walls={doc.walls} front={specs.frontSide} />
-                <p className="text-[10px] text-slate-500">Rear is the opposite side. Left / right are as seen when standing in front of the building.</p>
-              </div>
+                <p className="text-[10px]" style={{ color: UI.dim }}>Rear is the opposite side. Left and right are as seen when standing in front of the building.</p>
+              </Section>
 
-              <Field label="Drawing scale">
-                <select className={inputCls} value={String(specs.scaleDenom)} onChange={e => patchSpecs({ scaleDenom: e.target.value === 'auto' ? 'auto' : Number(e.target.value) })}>
-                  <option value="auto">Auto (best fit on A3)</option>
-                  {[20, 25, 50, 75, 100, 150, 200, 250].map(s => <option key={s} value={s}>1:{s}</option>)}
-                </select>
-              </Field>
-
-              <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-2 text-sm">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={specs.showDimensions} onChange={e => patchSpecs({ showDimensions: e.target.checked })} /> Dimension lines</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={specs.showLevels} onChange={e => patchSpecs({ showLevels: e.target.checked })} /> Level markers</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={specs.showTags} onChange={e => patchSpecs({ showTags: e.target.checked })} /> Window / door tags &amp; key</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={specs.showFloorLines} onChange={e => patchSpecs({ showFloorLines: e.target.checked })} /> Floor-level lines</label>
-              </div>
-
-              {validation.errors.map((m, i) => <div key={i} className="text-xs text-red-300 bg-red-950/50 border border-red-800 rounded p-2">{m}</div>)}
-              {[...validation.warnings, ...(result?.sheet?.warnings ?? [])].map((m, i) => <div key={i} className="text-xs text-amber-200 bg-amber-950/40 border border-amber-800 rounded p-2">{m}</div>)}
-              {result?.sheet && <div className="text-xs text-slate-400">Drawn at 1:{result.sheet.denom} on A3 landscape.</div>}
+              <Section title="Sheet">
+                <Field label="Drawing scale">
+                  <select className={inputCls} value={String(specs.scaleDenom)} onChange={e => patchSpecs({ scaleDenom: e.target.value === 'auto' ? 'auto' : Number(e.target.value) })}>
+                    <option value="auto">Auto (best fit on A3)</option>
+                    {[20, 25, 50, 75, 100, 150, 200, 250].map(s => <option key={s} value={s}>1:{s}</option>)}
+                  </select>
+                </Field>
+                <div className={boxCls}>
+                  <Check checked={specs.showDimensions} onChange={v => patchSpecs({ showDimensions: v })}>Dimension lines</Check>
+                  <Check checked={specs.showLevels} onChange={v => patchSpecs({ showLevels: v })}>Level markers</Check>
+                  <Check checked={specs.showTags} onChange={v => patchSpecs({ showTags: v })}>Window / door tags and key</Check>
+                  <Check checked={specs.showFloorLines} onChange={v => patchSpecs({ showFloorLines: v })}>Floor-level lines</Check>
+                </div>
+                {validation.errors.map((m, i) => <div key={i} className={errCls}>{m}</div>)}
+                {[...validation.warnings, ...(result?.sheet?.warnings ?? [])].map((m, i) => <div key={i} className={warnCls}>{m}</div>)}
+              </Section>
             </>
           )}
-        </div>
+        </aside>
+      </div>
 
-        {/* footer nav */}
-        <div className="p-3 border-t border-slate-700 flex gap-2">
-          <button disabled={step === 1} onClick={() => goStep((step - 1) as Step)} className="px-4 py-2 rounded bg-slate-800 border border-slate-600 hover:bg-slate-700 text-sm disabled:opacity-30">← Back</button>
-          {step < 4 ? (
-            <button disabled={!canGo((step + 1) as Step)} onClick={() => goStep((step + 1) as Step)} className="flex-1 py-2 rounded bg-blue-600 hover:bg-blue-500 text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed">
-              {step === 1 ? 'Next: trace external walls →' : step === 2 ? 'Next: windows & doors →' : 'Generate elevations →'}
-            </button>
-          ) : (
-            <div className="flex-1 grid grid-cols-3 gap-1">
-              <button onClick={exportPNG} disabled={!result?.sheet || busy} className="py-2 rounded bg-blue-600 hover:bg-blue-500 text-xs font-bold disabled:opacity-40">{busy ? '…' : 'PNG'}</button>
-              <button onClick={exportSVG} disabled={!result?.sheet} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-xs font-bold disabled:opacity-40">SVG</button>
-              <button onClick={printSheet} disabled={!result?.sheet} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-xs font-bold disabled:opacity-40">Print / PDF</button>
-            </div>
-          )}
-        </div>
-        {exportErr && <div className="px-3 pb-3 text-xs text-red-300">{exportErr}</div>}
-      </aside>
-
-      {/* ------------------------------------------------ workspace */}
-      <main className="flex-1 relative bg-slate-700 min-w-0">
-        {step === 4 ? (
-          <div className="absolute inset-0 overflow-auto p-6 flex justify-center items-start">
-            {result?.error ? (
-              <div className="mt-20 max-w-md text-center text-slate-200 bg-slate-800 border border-slate-600 rounded-xl p-6">
-                <div className="text-3xl mb-2">⚠️</div><div className="font-bold mb-1">Can’t draw the elevations yet</div>
-                <div className="text-sm text-slate-400">{result.error}</div>
-              </div>
-            ) : (
-              <div className="sheet-preview w-full max-w-[1400px]" dangerouslySetInnerHTML={{ __html: svgPreview }} />
-            )}
-          </div>
-        ) : plan ? (
-          <PlanViewport
-            src={plan.src} width={plan.width} height={plan.height}
-            panTool={tool === 'pan'} cursor={cursorFor}
-            onHover={onHover} onLeave={() => { setHover(null); setGhost(null); }}
-            onClickPt={onClickPt} onDoubleClickPt={onDoubleClickPt}
-            onDragStart={onDragStart} onDrag={onDrag} onDragEnd={onDragEnd}
-            overlay={overlay}
-          >
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-slate-900/90 border border-slate-600 text-xs text-slate-200 px-3 py-1.5 rounded-full pointer-events-none">
-              {step === 1 && (cal ? 'Scale set ✓ — you can continue, or click two new points to change it.' : calPts.length === 0 ? 'Click the first end of a known dimension' : calPts.length === 1 ? 'Click the second end' : 'Enter the real length in the sidebar')}
-              {step === 2 && (tool === 'trace' ? (chain ? 'Click the next corner · double-click or Enter to finish' : 'Click the first corner of the external wall') : tool === 'rect' ? 'Drag from one corner to the opposite corner' : tool === 'select' ? 'Click a wall to select it · Delete removes it' : 'Drag to pan')}
-              {step === 3 && (tool === 'addWindow' ? 'Click on a wall to place a window' : tool === 'addDoor' ? 'Click on a wall to place a door' : tool === 'select' ? 'Click an opening to edit · drag it along its wall' : 'Drag to pan')}
-            </div>
-          </PlanViewport>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-slate-300">
-            <div className="text-center max-w-sm">
-              <div className="text-5xl mb-3">🏠</div>
-              <div className="font-bold text-lg text-white mb-1">Start with a floor plan</div>
-              <div className="text-sm text-slate-300">Upload an image or PDF of the ground-floor plan. You’ll set the scale, pick the external walls, then add windows and doors.</div>
-            </div>
-          </div>
+      {/* ---------------- status bar */}
+      <footer style={{ background: '#181a1e', borderColor: UI.rule, fontFamily: MONO, color: UI.dim }} className="h-7 border-t flex items-center gap-4 px-3 text-xs shrink-0">
+        <span style={{ color: UI.text }} className="w-44">X {hover ? Math.round(hover.x) : '-'}  Y {hover ? Math.round(hover.y) : '-'}</span>
+        {step === 2 && (
+          <>
+            <button onClick={() => setSnapPts(s => !s)} style={{ color: snapPts ? UI.accent : UI.dim }}>SNAP</button>
+            <button onClick={() => setOrtho(o => !o)} style={{ color: ortho ? UI.accent : UI.dim }}>ORTHO</button>
+          </>
         )}
-      </main>
+        <span>{mmPerPx ? `1 px = ${mmPerPx.toFixed(2)} mm` : 'Scale not set'}</span>
+        <span className="flex-1" />
+        {step === 2 && <span>{doc.walls.length} walls, {perimeterM.toFixed(2)} m</span>}
+        {step === 3 && <span>{doc.openings.length} openings</span>}
+        {step === 4 && result?.sheet && <span>1:{result.sheet.denom} on A3</span>}
+      </footer>
     </div>
   );
 };
