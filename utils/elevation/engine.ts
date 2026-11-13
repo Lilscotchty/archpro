@@ -13,6 +13,7 @@ import {
 } from './types';
 import { Builder, LW, dimH, dimV, fmtLevel, levelMarker } from './builder';
 import { drawOpening, drawTag, styleLabel } from './symbols';
+import { buildHipRoof, HipRoof } from './hip';
 
 type V = { x: number; y: number };
 const dot = (a: V, b: V) => a.x * b.x + a.y * b.y;
@@ -104,6 +105,7 @@ type Roof =
   | { t: 'gable-end'; L: number; R: number; hMin: number; hMax: number; zEave: number; zApex: number; topZ: number }
   | { t: 'hip-eave'; L: number; R: number; zEave: number; zRidge: number; topL: number; topR: number; topZ: number }
   | { t: 'hip-end'; L: number; R: number; zEave: number; zApex: number; topZ: number }
+  | { t: 'hip-skel'; L: number; R: number; zEave: number; topZ: number; faces: HipViewFace[] }
   | { t: 'flat'; L: number; R: number; zTop: number; topZ: number }
   | { t: 'shed-along'; L: number; R: number; sgn: 1 | -1; zLo: number; zHi: number; topZ: number }
   | { t: 'shed-high'; L: number; R: number; zWall: number; topZ: number }
@@ -111,6 +113,9 @@ type Roof =
 
 const FASCIA = 150;
 const BARGE_DZ = 170;
+
+/** one roof plane as seen from a view: points in (h, z) elevation space, `eave` marks t == 0 points */
+interface HipViewFace { pts: { h: number; z: number; eave: boolean }[]; depth: number }
 
 interface ViewGeom {
   name: ViewName; n: V; h: V;
@@ -123,11 +128,16 @@ interface Derived {
   tanP: number;
   ridge: 'x' | 'y';
   hs: V; shedLow: number; shedSpan: number;
+  /** true hip roof (45-degree rule at every corner); null = could not be built, use the box approximation */
+  hip: HipRoof | null;
 }
 
 function derive(model: ElevationModel): Derived {
   const walls = toMMWalls(model.walls, model.mmPerPx);
   const s = model.specs;
+  const hip = s.roofType === 'hip'
+    ? buildHipRoof(walls.map(w => ({ a: w.a, b: w.b })), Math.max(250, 12 * model.mmPerPx), s.overhang)
+    : null;
   const pts = walls.flatMap(w => [w.a, w.b]);
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
   const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
@@ -136,7 +146,27 @@ function derive(model: ElevationModel): Derived {
   const proj = pts.map(p => dot(p, hs));
   const shedLow = Math.min(...proj);
   const shedSpan = Math.max(...proj) - shedLow;
-  return { walls, zPlate: s.floors * s.floorHeight, tanP: Math.tan((s.roofPitch * Math.PI) / 180), ridge, hs, shedLow, shedSpan };
+  return { walls, zPlate: s.floors * s.floorHeight, tanP: Math.tan((s.roofPitch * Math.PI) / 180), ridge, hs, shedLow, shedSpan, hip };
+}
+
+/**
+ * Project the true hip roof into one view. Only planes that face the viewer are kept; planes seen
+ * edge-on are left out because their outline is already the slanted edge of the neighbouring plane.
+ * Planes are sorted far -> near so nearer ones paint over farther ones (painter's algorithm).
+ */
+function hipViewRoof(v: ViewGeom, d: Derived, sp: ElevationSpecs): Roof {
+  const hip = d.hip!;
+  const zEave = d.zPlate - d.tanP * sp.overhang;
+  const z = (t: number) => zEave + d.tanP * t;
+  const all = hip.faces.flatMap(f => f.pts.map(p => dot(p, v.h)));
+  const faces: HipViewFace[] = hip.faces
+    .filter(f => dot(f.out, v.n) > 1e-3)
+    .map(f => ({
+      pts: f.pts.map(p => ({ h: dot(p, v.h), z: z(p.t), eave: p.t < 1e-6 })),
+      depth: f.pts.reduce((s, p) => s + dot(p, v.n), 0) / f.pts.length,
+    }))
+    .sort((a, b) => a.depth - b.depth);
+  return { t: 'hip-skel', L: Math.min(...all), R: Math.max(...all), zEave, topZ: z(hip.maxT), faces };
 }
 
 function viewGeoms(model: ElevationModel, d: Derived): ViewGeom[] {
@@ -169,6 +199,8 @@ function computeRoof(v: ViewGeom, d: Derived, sp: ElevationSpecs): Roof {
       if (d.ridge === hA) { const zRidge = zP + tp * (S / 2); return { t: 'gable-eave', L, R, zEave, zRidge, topZ: zRidge }; }
       { const zApex = zP + tp * (B / 2); return { t: 'gable-end', L, R, hMin: v.hMin, hMax: v.hMax, zEave, zApex, topZ: zApex }; }
     case 'hip':
+      if (d.hip) return hipViewRoof(v, d, sp);
+      // fallback (outline is not one closed loop): rectangular hip from the bounding box
       if (d.ridge === hA) {
         const run = S / 2 + o;
         const pyramid = L + run >= R - run;
@@ -333,6 +365,30 @@ function drawView(
       fasc(roof.L, roof.R, roof.zEave);
       break;
     }
+    case 'hip-skel': {
+      // an edge shared by two visible planes is a hip / valley / ridge (medium line);
+      // an edge that belongs to one visible plane is the roof outline (heavy line)
+      const r = (x: number) => Math.round(x / 5) * 5;
+      const keyOf = (p: { h: number; z: number }, q: { h: number; z: number }) => {
+        const a = `${r(p.h)},${r(p.z)}`, c = `${r(q.h)},${r(q.z)}`;
+        return a < c ? `${a}|${c}` : `${c}|${a}`;
+      };
+      const count = new Map<string, number>();
+      for (const f of roof.faces) for (let i = 0; i < f.pts.length; i++) {
+        const k = keyOf(f.pts[i], f.pts[(i + 1) % f.pts.length]);
+        count.set(k, (count.get(k) ?? 0) + 1);
+      }
+      for (const f of roof.faces) {
+        b.poly(f.pts.flatMap(p => [p.h, p.z]), { closed: true, fill: true, stroke: false });
+        for (let i = 0; i < f.pts.length; i++) {
+          const p = f.pts[i], q = f.pts[(i + 1) % f.pts.length];
+          if (Math.abs(p.h - q.h) < 1 && Math.abs(p.z - q.z) < 1) continue;
+          b.line(p.h, p.z, q.h, q.z, (count.get(keyOf(p, q)) ?? 1) > 1 ? LW.med : LW.heavy);
+          if (p.eave && q.eave) fasc(Math.min(p.h, q.h), Math.max(p.h, q.h), p.z);   // fascia board along each visible eave
+        }
+      }
+      break;
+    }
     case 'gable-end': {
       const mid = (roof.hMin + roof.hMax) / 2;
       // wall infill (gable triangle) – no base line so the wall reads as one plane
@@ -368,7 +424,7 @@ function drawView(
   // eaves / parapet, otherwise just below it
   const tagTop = (cx: number): number => {
     switch (roof.t) {
-      case 'gable-eave': case 'hip-eave': case 'hip-end': case 'shed-low': return roof.zEave - FASCIA;
+      case 'gable-eave': case 'hip-eave': case 'hip-end': case 'hip-skel': case 'shed-low': return roof.zEave - FASCIA;
       case 'shed-high': return roof.zWall - 80;
       case 'shed-along': return wallTop(roof, d, sp, v, cx, { x: 0, y: 0 }) - 180;
       case 'flat': return roof.zTop;
@@ -437,6 +493,9 @@ export function buildSheet(model: ElevationModel): Sheet {
   const d = derive(model);
   const views = viewGeoms(model, d);
   const roofs = views.map(v => computeRoof(v, d, sp));
+  if (sp.roofType === 'hip' && !d.hip) {
+    warnings.push('The walls do not form one clean closed loop, so the hip roof is approximated from the building\'s bounding box instead of following every corner at 45 degrees.');
+  }
 
   // drawing area
   const frame = 10;
