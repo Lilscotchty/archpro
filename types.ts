@@ -69,10 +69,6 @@ export interface BoQItem {
   description: string;
   quantity: number;
   unit: string;
-  // Optional fields used by the SMM7 workbook (priced / traceable items)
-  id?: string;
-  rate?: number;
-  source?: 'engine' | 'takeoff' | 'manual' | 'ai';
 }
 
 export interface BackendSpecData {

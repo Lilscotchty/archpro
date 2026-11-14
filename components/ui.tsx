@@ -39,6 +39,11 @@ const ICONS: Record<string, string> = {
   risk: 'M12 3l10 18H2zM12 10v5M12 18h.01',
   plus: 'M12 5v14M5 12h14',
   trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
+  spark: 'M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z',
+  sum: 'M18 5H6l7 7-7 7h12',
+  coins: 'M12 4c4 0 7 1.3 7 3s-3 3-7 3-7-1.3-7-3 3-3 7-3zM5 7v5c0 1.7 3 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3 3 7 3s7-1.3 7-3v-5',
+  upload: 'M12 16V4m0 0l-4 4m4-4l4 4M4 20h16',
+  setup: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4',
 };
 
 export const Icon: React.FC<{ n: keyof typeof ICONS | string; s?: number }> = ({ n, s = 18 }) => (
