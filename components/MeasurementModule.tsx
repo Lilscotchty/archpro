@@ -9,12 +9,15 @@ import { AiPanel } from './measurement/AiPanel';
 import { BillView } from './measurement/BillView';
 import { SummaryView } from './measurement/SummaryView';
 import { RatesView } from './measurement/RatesView';
+import { DrawingsPanel } from './measurement/DrawingsPanel';
+import { useAutoDrawings } from './measurement/useAutoDrawings';
+import { DrawingMeta } from '../utils/drawings/types';
 import { fmt } from './measurement/fields';
 import { Icon, Panel, Rail, Screen, Section, StatusBar, UI, MONO, btnGhost, btnPrimary } from './ui';
 import { billCsv, download, printBill } from '../utils/boq/export';
 
-type Tab = 'setup' | 'schedule' | 'ai' | 'bill' | 'summary' | 'rates';
-const TITLES: Record<Tab, string> = { setup: 'Setup', schedule: 'Schedule', ai: 'AI drawing reader', bill: 'Bill of quantities', summary: 'Summary', rates: 'Rates' };
+type Tab = 'setup' | 'schedule' | 'drawings' | 'ai' | 'bill' | 'summary' | 'rates';
+const TITLES: Record<Tab, string> = { setup: 'Setup', schedule: 'Schedule', drawings: 'Drawings', ai: 'AI drawing reader', bill: 'Bill of quantities', summary: 'Summary', rates: 'Rates' };
 
 interface Props { project: ProjectState; onClose: () => void }
 
@@ -22,6 +25,8 @@ export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
   const s = useBoqState(project);
   const [tab, setTab] = useState<Tab>(() => (s.built.lines.length ? 'bill' : 'setup'));
   const fileRef = useRef<HTMLInputElement>(null);
+  const [aiDrawing, setAiDrawing] = useState<DrawingMeta | null>(null);
+  const drawings = useAutoDrawings(project, s.assumptions);
   const hasPlan = project.elements.some(e => (e.type as string) === 'wall');
   const approx = s.built.lines.filter(l => l.basis === 'approx').length;
   const slug = (s.assumptions.projectName || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -49,6 +54,7 @@ export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
         <Rail value={tab} onChange={id => setTab(id as Tab)} items={[
           { id: 'setup', icon: 'setup', label: 'Setup and assumptions' },
           { id: 'schedule', icon: 'table', label: 'Walls, openings, columns' },
+          { id: 'drawings', icon: 'drawings', label: 'Drawings' },
           { id: 'ai', icon: 'spark', label: 'AI drawing reader' },
           { id: 'bill', icon: 'measure', label: 'Bill of quantities' },
           { id: 'summary', icon: 'sum', label: 'Summary' },
@@ -57,7 +63,8 @@ export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
         <main className="flex-1 min-w-0 overflow-auto p-6" style={{ background: UI.bg }}>
           {tab === 'setup' && <SetupPanel s={s} />}
           {tab === 'schedule' && <SchedulePanel s={s} hasPlan={hasPlan} />}
-          {tab === 'ai' && <AiPanel s={s} onApplied={() => setTab('schedule')} />}
+          {tab === 'drawings' && <DrawingsPanel {...drawings} hasPlan={hasPlan} onUseInAi={m => { setAiDrawing(m); setTab('ai'); }} />}
+          {tab === 'ai' && <AiPanel s={s} onApplied={() => setTab('schedule')} initialDrawing={aiDrawing} />}
           {tab === 'bill' && <BillView s={s} />}
           {tab === 'summary' && <SummaryView s={s} />}
           {tab === 'rates' && <RatesView s={s} />}

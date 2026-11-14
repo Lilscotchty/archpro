@@ -5,13 +5,15 @@ import { Card, Check, Lbl, Select, TextInput } from './fields';
 import { Empty, Tag, UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
 import { AiExtraction, DEFAULT_GROQ_MODEL, analyseDrawing, applyExtraction, listGroqModels, mergeExtractions } from '../../utils/boq/ai';
 import { rasterizeForAi } from '../../utils/boq/rasterize';
+import { DrawingMeta } from '../../utils/drawings/types';
+import { getDrawingBlob, listDrawings, subscribe } from '../../utils/drawings/store';
 
 const K_KEY = 'archpro.groqKey', K_MODEL = 'archpro.groqModel';
 const lsGet = (k: string) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } };
 const lsSet = (k: string, v: string) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* storage blocked */ } };
 const MAX_PAGES = 4;
 
-export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void }> = ({ s, onApplied }) => {
+export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDrawing?: DrawingMeta | null }> = ({ s, onApplied, initialDrawing }) => {
   const [key, setKey] = useState(lsGet(K_KEY));
   const [remember, setRemember] = useState(!!lsGet(K_KEY));
   const [model, setModel] = useState(lsGet(K_MODEL) || DEFAULT_GROQ_MODEL);
@@ -28,6 +30,16 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void }> = ({ s, o
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [applied, setApplied] = useState('');
   const abort = useRef<AbortController | null>(null);
+  const [stored, setStored] = useState<DrawingMeta[]>([]);
+  const [storedId, setStoredId] = useState('');
+  React.useEffect(() => { const load = () => listDrawings().then(setStored).catch(() => undefined); load(); return subscribe(load); }, []);
+  const pickStored = async (id: string) => {
+    setStoredId(id); if (!id) return;
+    const m = stored.find(d => d.id === id); if (!m) return;
+    try { const b = await getDrawingBlob(m); setFile(new File([b], `${m.ref}.${m.mime.includes('svg') ? 'svg' : m.mime.includes('pdf') ? 'pdf' : m.mime.includes('png') ? 'png' : 'jpg'}`, { type: m.mime })); setResult(null); setApplied(''); setFrom(1); setTo(1); setError(''); }
+    catch (e) { setError((e as Error).message); }
+  };
+  React.useEffect(() => { if (initialDrawing && stored.some(d => d.id === initialDrawing.id)) pickStored(initialDrawing.id); }, [initialDrawing?.id, stored.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveKey = (k: string, r = remember) => { setKey(k); lsSet(K_KEY, r ? k : ''); };
   const saveModel = (m: string) => { setModel(m); lsSet(K_MODEL, m); };
@@ -86,8 +98,14 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void }> = ({ s, o
         <div><button className={btnGhost} onClick={loadModels} disabled={!key.trim()}>Check key and list models</button></div>
       </Card>
       <Card title="Drawing">
-        <Lbl label="File (PNG, JPG or PDF)">
-          <input type="file" accept="image/*,application/pdf" className={inputCls} onChange={e => { const f = e.target.files?.[0] ?? null; setFile(f); setResult(null); setApplied(''); setFrom(1); setTo(1); }} />
+        <Lbl label="Stored drawing (by designated id)" hint="Drawings from the Drafting Studio, Elevation Studio, auto-generated and uploaded ones.">
+          <select className={inputCls} value={storedId} onChange={e => pickStored(e.target.value)}>
+            <option value="">Choose a stored drawing…</option>
+            {stored.map(d => <option key={d.id} value={d.id}>{d.ref}  {d.title}</option>)}
+          </select>
+        </Lbl>
+        <Lbl label="Or a file (PNG, JPG or PDF)">
+          <input type="file" accept="image/*,application/pdf" className={inputCls} onChange={e => { const f = e.target.files?.[0] ?? null; setFile(f); setStoredId(''); setResult(null); setApplied(''); setFrom(1); setTo(1); }} />
         </Lbl>
         <div className="grid grid-cols-2 gap-2">
           <Lbl label="From page"><input type="number" min={1} className={inputCls} value={from} onChange={e => { const n = Math.max(1, parseInt(e.target.value) || 1); setFrom(n); if (to < n) setTo(n); }} /></Lbl>

@@ -3,6 +3,7 @@ import { Dashboard } from './components/Dashboard';
 import { MethodStudy } from './components/MethodStudy';
 import { PhysicsLab } from './components/PhysicsLab';
 import { MeasurementModule } from './components/MeasurementModule';
+import { saveFromDrafting } from './utils/drawings/pack';
 import { AppStep, ProjectState, AppModule } from './types';
 import { ElevationStudio } from './components/elevation/ElevationStudio';
 import type { ElevationStudioProps } from './components/elevation/ElevationStudio';
@@ -388,6 +389,13 @@ function App() {
     return { title: 'Foundation plan', src: c.toDataURL('image/png') };
   };
 
+  // Generating the sheet also stores it (with the plan data that produced it) under its designated id.
+  const openFoundationSheet = () => {
+    const sh = foundationPlan();
+    setSheet(sh);
+    void saveFromDrafting(project, sh, { w: SHEET.W, h: SHEET.H }).catch(() => undefined);
+  };
+
   // Elevations live in the Elevation Studio. Hand over the plan and any walls already drawn here.
   const openElevationStudio = () => {
     setStudioInitial({
@@ -417,7 +425,7 @@ function App() {
           <span style={{ color: C.dim }}>/ Drafting studio</span>
           <div className="flex-1" />
           {drafting && <>
-            <button onClick={() => setSheet(foundationPlan())} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Foundation plan</button>
+            <button onClick={openFoundationSheet} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Foundation plan</button>
             <button onClick={openElevationStudio} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Elevations</button>
           </>}
         </header>

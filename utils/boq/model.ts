@@ -38,7 +38,10 @@ export function footprintOf(ext: El[]): { lengthM: number; widthM: number; areaM
   return { lengthM: bbox.lengthM, widthM: bbox.widthM, areaM2: Math.abs(s) / 2 / 1e6 };
 }
 
-export function modelFromProject(project: ProjectState, a: Assumptions): BoqModel {
+export interface PlanMarks { wallLabel: Map<string, string>; openingMark: Map<string, string>; external: Map<string, boolean> }
+
+/** Same analysis as the take-off, but also returns the labels printed on generated drawings so drawing and schedule always agree. */
+export function modelWithMarks(project: ProjectState, a: Assumptions): { model: BoqModel; marks: PlanMarks } {
   const els = project.elements as unknown as El[];
   const walls = els.filter(e => e.type === 'wall');
   const t = project.settings.wallWidth;
@@ -62,6 +65,7 @@ export function modelFromProject(project: ProjectState, a: Assumptions): BoqMode
     return best ? !!isExt.get((best as El).id) : true;
   };
   const groups = new Map<string, OpeningRow>();
+  const elKey = new Map<string, string>();
   els.filter(e => e.type === 'door' || e.type === 'window').forEach(e => {
     const kind = e.type as 'door' | 'window';
     const raw = Math.abs(e.x2 - e.x1) || dist(e.x1, e.y1, e.x2, e.y2);
@@ -69,6 +73,7 @@ export function modelFromProject(project: ProjectState, a: Assumptions): BoqMode
     const h = kind === 'door' ? 2100 : 1200;
     const external = kind === 'window' ? true : nearestExternal(e.x1, e.y1);
     const k = `${kind}|${external}|${w}|${h}`;
+    elKey.set(e.id, k);
     const g = groups.get(k);
     if (g) g.qty += 1;
     else groups.set(k, { id: uid(), kind, mark: '', description: kind === 'window' ? 'Aluminium sliding window, glazed' : external ? 'Panel door, hardwood frame' : 'Flush door, hardwood frame',
@@ -88,7 +93,16 @@ export function modelFromProject(project: ProjectState, a: Assumptions): BoqMode
 
   const extWalls = walls.filter(w => isExt.get(w.id));
   const fp = footprintOf(extWalls);
-  return { walls: wallRows, openings, columns: [...cg.values()], footprint: { ...fp, source: 'plan' } };
+  const markByKey = new Map<string, string>();
+  [...groups.entries()].forEach(([k, o]) => { const done = openings.find(x => x.id === o.id); if (done) markByKey.set(k, done.mark); });
+  const marks: PlanMarks = {
+    wallLabel: new Map(wallRows.map(w => [w.id, w.label])),
+    openingMark: new Map([...elKey.entries()].map(([id, k]) => [id, markByKey.get(k) ?? ''])),
+    external: new Map(wallRows.map(w => [w.id, w.external])),
+  };
+  return { model: { walls: wallRows, openings, columns: [...cg.values()], footprint: { ...fp, source: 'plan' } }, marks };
 }
+
+export const modelFromProject = (project: ProjectState, a: Assumptions): BoqModel => modelWithMarks(project, a).model;
 
 export const EMPTY_MODEL: BoqModel = { walls: [], openings: [], columns: [], footprint: { lengthM: 0, widthM: 0, areaM2: 0, source: 'manual' } };
