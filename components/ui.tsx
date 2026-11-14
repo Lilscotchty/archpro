@@ -31,6 +31,14 @@ const ICONS: Record<string, string> = {
   close: 'M6 6l12 12M18 6L6 18',
   file: 'M7 3h7l5 5v13H7zM14 3v5h5',
   tool: 'M14 6a4 4 0 105 5l-9 9a2 2 0 01-3-3l9-9',
+  table: 'M4 5h16v14H4zM4 10h16M4 15h16M10 5v14',
+  thermal: 'M10 14V5a2 2 0 014 0v9a4 4 0 11-4 0zM12 9v7',
+  loads: 'M4 18h16M6 18V9h12v9M12 3v6M9 6l3 3 3-3',
+  carbon: 'M12 3c5 3 7 7 4 11a6 6 0 01-8 1c-3-3-2-8 4-12zM12 21v-8',
+  gantt: 'M4 6h8M8 12h10M6 18h7M4 3v18',
+  risk: 'M12 3l10 18H2zM12 10v5M12 18h.01',
+  plus: 'M12 5v14M5 12h14',
+  trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
 };
 
 export const Icon: React.FC<{ n: keyof typeof ICONS | string; s?: number }> = ({ n, s = 18 }) => (
@@ -82,3 +90,50 @@ export const Tag: React.FC<{ tone?: 'ok' | 'warn' | 'dim'; children: React.React
   const c = tone === 'ok' ? UI.ok : tone === 'warn' ? UI.warn : UI.dim;
   return <span className="px-1.5 py-0.5 text-[10px] border rounded-[3px] uppercase tracking-wide" style={{ color: c, borderColor: c + '66', fontFamily: MONO }}>{children}</span>;
 };
+
+/** Bottom status bar (same strip the studios use). */
+export const StatusBar: React.FC<{ left?: React.ReactNode; right?: React.ReactNode }> = ({ left, right }) => (
+  <footer style={{ background: UI.raised, borderColor: UI.rule, fontFamily: MONO, color: UI.dim }} className="h-7 border-t flex items-center gap-4 px-3 text-xs shrink-0">
+    {left}<span className="flex-1" />{right}
+  </footer>
+);
+
+/** Left icon rail: tab / tool buttons in the same style as the studio tool palette. */
+export const Rail: React.FC<{ items: { id: string; icon: string; label: string }[]; value: string; onChange: (id: string) => void }> = ({ items, value, onChange }) => (
+  <nav style={{ background: UI.panel, borderColor: UI.rule }} className="w-12 border-r flex flex-col items-center py-2 gap-1 shrink-0">
+    {items.map(it => (
+      <button key={it.id} title={it.label} onClick={() => onChange(it.id)}
+        style={{ background: value === it.id ? UI.accent : 'transparent', color: value === it.id ? UI.accentInk : UI.text }}
+        className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1">
+        <Icon n={it.icon} />
+      </button>
+    ))}
+  </nav>
+);
+
+/** Right-hand properties panel. */
+export const Panel: React.FC<{ children: React.ReactNode; width?: string }> = ({ children, width = 'w-72' }) => (
+  <aside style={{ background: UI.panel, borderColor: UI.rule }} className={`${width} border-l overflow-y-auto shrink-0`}>{children}</aside>
+);
+
+export const Empty: React.FC<{ icon: string; title: string; hint: string }> = ({ icon, title, hint }) => (
+  <div className="h-full grid place-items-center">
+    <div className="text-center max-w-xs">
+      <div style={{ color: UI.dim }} className="flex justify-center"><Icon n={icon} s={28} /></div>
+      <div className="mt-3 font-semibold" style={{ color: '#e6e9ed' }}>{title}</div>
+      <div className="mt-1 text-xs" style={{ color: UI.dim }}>{hint}</div>
+    </div>
+  </div>
+);
+
+export const Stat: React.FC<{ label: string; value: string; unit?: string; tone?: 'ok' | 'warn' | 'danger' }> = ({ label, value, unit, tone }) => (
+  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] px-3 py-2">
+    <div className="text-[11px]" style={{ color: UI.dim }}>{label}</div>
+    <div className="mt-0.5 text-xl" style={{ fontFamily: MONO, color: tone === 'ok' ? UI.ok : tone === 'warn' ? UI.warn : tone === 'danger' ? UI.danger : '#e6e9ed' }}>
+      {value}{unit && <span className="text-xs" style={{ color: UI.dim }}> {unit}</span>}
+    </div>
+  </div>
+);
+
+export const thCls = 'px-3 py-2 font-medium text-left';
+export const tdCls = 'px-3 py-2';

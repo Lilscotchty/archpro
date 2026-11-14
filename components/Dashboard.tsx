@@ -13,10 +13,10 @@ const MODULES: { id: AppModule; title: string; desc: string; icon: string; ready
     desc: 'Upload a plan (image or PDF), pick the external walls, windows and doors, and get front, rear and side elevations as black-and-white line drawings.' },
   { id: AppModule.MEASUREMENT, title: 'Measurement', icon: 'measure', ready: true, hotkey: '3',
     desc: 'SMM7 bill of quantities and material take-offs from your foundation layout.' },
-  { id: AppModule.METHOD_STUDY, title: 'Method study', icon: 'method', ready: false, hotkey: '4',
-    desc: 'Site organisation, safety plans and construction methodology.' },
-  { id: AppModule.PHYSICS, title: 'Building physics', icon: 'physics', ready: false, hotkey: '5',
-    desc: 'Thermal calculations, structural load analysis and environmental impact.' },
+  { id: AppModule.METHOD_STUDY, title: 'Method study', icon: 'method', ready: true, hotkey: '4',
+    desc: 'Build the construction programme with critical path, and keep the site risk register.' },
+  { id: AppModule.PHYSICS, title: 'Building physics', icon: 'physics', ready: true, hotkey: '5',
+    desc: 'U-values and heat loss, one-way slab load take-down, and embodied carbon.' },
 ];
 
 export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
