@@ -55,10 +55,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
   ];
 
   return (
-    <div className="dash-root flex flex-col items-center justify-center min-h-screen p-8 relative z-10">
+    <div className="legacy-dash flex flex-col items-center justify-center min-h-screen p-8 relative z-10">
+      {/* Styles scoped to the dashboard only, so other pages keep the unified studio look */}
       <style>{`
-        .dash-root { background-color: #0f172a; color: #e2e8f0; font-family: Inter, "Segoe UI", system-ui, sans-serif; }
-        .dash-root .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+        .legacy-dash { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+        .legacy-dash .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
       `}</style>
       
       {/* HEADER SECTION */}

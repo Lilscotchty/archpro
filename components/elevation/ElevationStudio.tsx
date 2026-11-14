@@ -10,6 +10,7 @@ import { MiniPlan } from './MiniPlan';
 import { loadPlanFile } from '../../utils/elevation/planLoader';
 import { assignMarks, buildSheet, validateModel } from '../../utils/elevation/engine';
 import { sheetToSVG, svgToPngBlob } from '../../utils/elevation/svg';
+import { saveFromElevation } from '../../utils/drawings/pack';
 import { DOOR_STYLES, WINDOW_STYLES, styleDefaults } from '../../utils/elevation/symbols';
 import {
   DEFAULT_SPECS, ElevationModel, ElevationSpecs, ExtWall, Opening, OpeningKind, OpeningStyle, PlanSide, PlanSource, Pt, RoofType,
@@ -397,6 +398,14 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
   }, [step, model]);
   const svgPreview = useMemo(() => (result?.sheet ? sheetToSVG(result.sheet, { responsive: true }) : ''), [result]);
   const marks = useMemo(() => assignMarks(doc.openings, specs.floors), [doc.openings, specs.floors]);
+
+  // Store the sheet and the data that produced it under its designated id (updates the same drawing on every change).
+  useEffect(() => {
+    const sh = result?.sheet;
+    if (!sh || doc.walls.length === 0) return;
+    const t = window.setTimeout(() => { void saveFromElevation(sheetToSVG(sh), model, sh.denom, plan).catch(() => undefined); }, 3000);
+    return () => window.clearTimeout(t);
+  }, [result, plan]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const download = (blob: Blob, name: string) => {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();

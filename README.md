@@ -6,7 +6,7 @@ A browser-based construction toolkit built with React, Vite and TypeScript.
 | --- | --- |
 | **Drawings & Simulation** | Trace a plan, draw grids/walls and generate a foundation plan sheet. |
 | **Elevation Studio** *(new)* | Upload a plan (image or PDF) and generate **front, rear, left and right elevations** as black-and-white line drawings. |
-| **Calculation & Measurement** | SMM7 bill-of-quantities take-off. |
+| **Calculation & Measurement** | SMM7 take-off, priced bill of quantities and summary, AI drawing reader (Groq), stored drawings. |
 | **Method Study** | Construction programme with critical path (Gantt) and a site risk register, both exportable to CSV. |
 | **Building Physics** | U-value and heat loss, one-way slab / beam load take-down, and an editable embodied-carbon estimate. |
 
@@ -36,6 +36,42 @@ Output is strictly black line-work on white: no colour and no grey fills. Window
 - Roofs are derived from the building's bounding box, so L/U-shaped plans get a simplified roof.
 - One plan = one set of openings; use "Appears on" to repeat openings on several floors.
 - Elevations show walls, openings and roof only (no chimneys, steps, balconies or cladding patterns).
+
+
+## Measurement (SMM7)
+
+Plan data (or an AI-read drawing) -> take-off -> priced bill -> summary. Tabs: **Setup**, **Schedule**, **Drawings**, **AI drawing reader**, **Bill**, **Summary**, **Rates**.
+
+- **Take-off** covers excavation and filling (D20), concrete, formwork and reinforcement (E10/E20/E30), blockwork and DPC (F10/F30), roof carcass and covering (G20, H31/H60), DPM (J40), doors, windows and stairs (L10/L20/L30), ceilings (K10/K13), screeds, render, tiling and paint (M10/M20/M40/M60), skirtings and fascia (P20), rainwater (R10) and provisional sums for services and external works.
+- Quantities are **net** (no waste or laps). Every line shows its workings; click a description. Quantities and rates can be overridden per line (kept when the plan changes), items can be omitted, and your own items can be added.
+- **Walls, openings and columns** come from the Drafting Studio (mm coordinates). Outer walls are detected from the plan; tick *Ext.* on the Schedule tab for any it missed (L/U shaped plans). Footprint area uses the wall loop when it closes, otherwise the bounding box.
+- **Rates are placeholders.** Replace them on the Rates tab (or scale them all at once) before using any total. Preliminaries, overheads, contingency and tax are percentages on the Summary tab.
+- **Items marked approx** (reinforcement per m3, roof carcass, skirting, anti-termite, stairs) rest on stated assumptions. Replace them with measured quantities from the structural and detail drawings.
+- Section codes are SMM7 work sections. Check descriptions and measurement rules against the SMM7 classification tables before issuing tender documents. This tool is a take-off aid; a quantity surveyor should review the output.
+- Export: CSV, print/PDF, and a JSON estimate file (Save / Open). The estimate also autosaves in the browser.
+
+### AI drawing reader (Groq)
+
+Enter a Groq API key on the AI tab (stored in this browser only if you tick *Remember*). Choose a stored drawing or upload an image/PDF (up to 4 pages at a time) and press **Read drawing**. A vision model **reads** printed dimensions, door and window schedules, room labels and notes. It does not measure by scale. The result is sanity-checked, shown for review, and enters the schedule only when you apply it. Use **Check key and list models** to pick a vision-capable model your account offers (default: Llama 4 Scout).
+The key is used directly from the browser, so treat it as exposed to anyone who can open dev tools on your machine. For a shared deployment, route the call through your own backend.
+
+## Drawing storage (Supabase)
+
+Every drawing is stored under a designated id (`<set code>-FLOOR-PLAN`, `-FOUNDATION-PLAN`, `-ELEVATIONS`, `-SOURCE-PLAN`, `-UPLOAD-01` ...) together with the data from the page that produced it (plan elements and settings, elevation model, assumptions, wall and opening references). Saving again updates the same drawing and bumps its version.
+
+- The **Drafting Studio** saves its foundation plan sheet, an SVG floor plan and the plan underlay when you press *Foundation plan*.
+- The **Elevation Studio** saves its elevation sheet, model and plan underlay shortly after each change.
+- The **Measurement** module generates the floor plan, foundation plan and elevations it needs in the background (toggle on the Drawings tab) and lists everything for viewing and download (SVG/PNG/PDF, plus the stored data as JSON).
+
+Setup: create a Supabase project, run `supabase/schema.sql` in the SQL editor, enable **Authentication -> Sign in -> Allow anonymous sign-ins**, then copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the public anon key only; never put a service-role key in the app). Row-level security keeps each sign-in's drawings private. Without these, drawings are kept in this browser (IndexedDB) and the Drawings tab says so; *Copy local to Supabase* uploads them later.
+
+## Checks
+
+```bash
+npx tsx scripts/boq-selftest.ts        # take-off against hand calculations, AI parsing/merge
+npx tsx scripts/drawings-selftest.ts   # generated drawings
+npm i --no-save fake-indexeddb && npx tsx scripts/store-selftest.ts   # local drawing store
+```
 
 ## Run
 
