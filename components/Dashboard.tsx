@@ -1,68 +1,121 @@
 import React from 'react';
 import { AppModule } from '../types';
-import { Icon, Screen, Tag, UI, MONO } from './ui';
 
 interface DashboardProps {
   onSelectModule: (module: AppModule) => void;
 }
 
-const MODULES: { id: AppModule; title: string; desc: string; icon: string; ready: boolean; hotkey: string }[] = [
-  { id: AppModule.DRAWINGS, title: 'Drafting studio', icon: 'drawings', ready: true, hotkey: '1',
-    desc: 'Trace a floor plan, lay out grids and walls, and generate the foundation plan sheet.' },
-  { id: AppModule.ELEVATIONS, title: 'Elevation studio', icon: 'elevations', ready: true, hotkey: '2',
-    desc: 'Upload a plan (image or PDF), pick the external walls, windows and doors, and get front, rear and side elevations as black-and-white line drawings.' },
-  { id: AppModule.MEASUREMENT, title: 'Measurement', icon: 'measure', ready: true, hotkey: '3',
-    desc: 'SMM7 bill of quantities and material take-offs from your foundation layout.' },
-  { id: AppModule.METHOD_STUDY, title: 'Method study', icon: 'method', ready: true, hotkey: '4',
-    desc: 'Build the construction programme with critical path, and keep the site risk register.' },
-  { id: AppModule.PHYSICS, title: 'Building physics', icon: 'physics', ready: true, hotkey: '5',
-    desc: 'U-values and heat loss, one-way slab load take-down, and embodied carbon.' },
-];
-
 export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
-      const m = MODULES.find(x => x.hotkey === e.key);
-      if (m) onSelectModule(m.id);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onSelectModule]);
+  const modules = [
+    {
+      id: AppModule.DRAWINGS,
+      title: 'Drawings & Simulation',
+      desc: 'AI-assisted structural layouts, foundation generation, and auto-drafting.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+      ),
+      gradient: 'from-blue-500 to-cyan-400'
+    },
+    {
+      id: AppModule.ELEVATIONS,
+      title: 'Elevation Studio',
+      desc: 'Upload a plan (image or PDF), pick the external walls, windows and doors, and get front, rear and side elevations as clean black-and-white line drawings.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6M7 13h.01M17 13h.01" /></svg>
+      ),
+      gradient: 'from-rose-500 to-orange-400'
+    },
+    {
+      id: AppModule.MEASUREMENT,
+      title: 'Calculation & Measurement',
+      desc: 'SMM7 Bill of Quantities, material take-offs, and cost estimation.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+      ),
+      gradient: 'from-emerald-500 to-teal-400'
+    },
+    {
+      id: AppModule.METHOD_STUDY,
+      title: 'Method Study',
+      desc: 'Site organization, safety plans, and construction methodology.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+      ),
+      gradient: 'from-purple-500 to-pink-400'
+    },
+    {
+      id: AppModule.PHYSICS,
+      title: 'Building Physics Lab',
+      desc: 'Thermal calculations, structural load analysis, and environmental impact.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+      ),
+      gradient: 'from-amber-500 to-orange-400'
+    }
+  ];
 
   return (
-    <Screen crumb="Dashboard">
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-6 py-10">
-          <h1 className="text-lg font-semibold tracking-tight" style={{ color: '#e6e9ed' }}>Workspace</h1>
-          <p className="mt-1 text-xs" style={{ color: UI.dim }}>Choose a studio. Press the number shown on a tile to open it.</p>
+    <div className="legacy-dash flex flex-col items-center justify-center min-h-screen p-8 relative z-10">
+      {/* Styles scoped to the dashboard only, so other pages keep the unified studio look */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+        .legacy-dash { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+        .legacy-dash .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+      `}</style>
+      
+      {/* HEADER SECTION */}
+      <div className="text-center mb-16 relative">
+        <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full -z-10 animate-pulse"></div>
+        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 mb-4 tracking-tight drop-shadow-lg">
+          Construct<span className="text-blue-400">OS</span>
+        </h1>
+        <p className="text-lg text-slate-300 max-w-xl mx-auto font-light tracking-wide text-shine">
+          The Spatial Engineering Platform.
+        </p>
+      </div>
 
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {MODULES.map(m => (
-              <button key={m.id} onClick={() => onSelectModule(m.id)}
-                style={{ background: UI.panel, borderColor: UI.rule }}
-                className="group text-left border rounded-[3px] p-4 flex flex-col gap-3 hover:border-[#4aa3ff] focus-visible:outline outline-2 outline-offset-2 outline-[#4aa3ff]">
-                <div className="flex items-center justify-between">
-                  <span style={{ color: m.ready ? UI.accent : UI.dim }}><Icon n={m.icon} s={22} /></span>
-                  <span className="flex items-center gap-2">
-                    {!m.ready && <Tag>Soon</Tag>}
-                    <span className="text-[10px] px-1.5 py-0.5 border rounded-[3px]" style={{ borderColor: UI.rule, color: UI.dim, fontFamily: MONO }}>{m.hotkey}</span>
-                  </span>
-                </div>
-                <div>
-                  <div className="font-semibold" style={{ color: '#e6e9ed' }}>{m.title}</div>
-                  <div className="mt-1 text-xs leading-relaxed" style={{ color: UI.dim }}>{m.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
+      {/* CARDS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full">
+        {modules.map((mod, idx) => (
+          <button
+            key={mod.id}
+            onClick={() => onSelectModule(mod.id)}
+            /* UPDATED CLASS NAMES:
+              - Removed generic hover styles from glass-panel
+              - Added specific 'hover:scale-[1.01]' and 'hover:bg-white/10' here
+              - Removed rainbow borders
+            */
+            className="glass-panel group rounded-3xl p-8 text-left relative overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:bg-white/10 hover:shadow-2xl"
+            style={{ animationDelay: `${idx * 150}ms` }}
+          >
+            {/* INNER GLOW (Cleaned up) */}
+            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${mod.gradient} opacity-20 blur-2xl group-hover:opacity-30 transition-opacity duration-500 rounded-full -mr-10 -mt-10`}></div>
+            
+            <div className="flex items-start gap-6 relative z-10">
+              <div className={`p-4 rounded-2xl bg-gradient-to-br ${mod.gradient} text-white shadow-lg group-hover:scale-105 transition-transform duration-500`}>
+                {mod.icon}
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-blue-200 transition-colors">
+                  {mod.title}
+                </h3>
+                <p className="text-slate-400 text-sm leading-relaxed font-medium group-hover:text-slate-200 transition-colors">
+                  {mod.desc}
+                </p>
+              </div>
+            </div>
 
-          <div className="mt-10 text-[10px] uppercase tracking-widest" style={{ color: UI.dim, fontFamily: MONO }}>
-            ArchPro · SMM7 engine
-          </div>
-        </div>
-      </main>
-    </Screen>
+            {/* ACTION ARROW */}
+            <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
+               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+            </div>
+          </button>
+        ))}
+      </div>
+      
+      <div className="mt-20 text-slate-500/50 text-xs font-mono tracking-widest uppercase">
+        v2.6.0 Stable / SMM7 Engine
+      </div>
+    </div>
   );
 };
