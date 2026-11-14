@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Dashboard } from './components/Dashboard';
-import { ComingSoon } from './components/ComingSoon';
+import { MethodStudy } from './components/MethodStudy';
+import { PhysicsLab } from './components/PhysicsLab';
 import { MeasurementModule } from './components/MeasurementModule';
 import { AppStep, ProjectState, AppModule } from './types';
 import { ElevationStudio } from './components/elevation/ElevationStudio';
@@ -23,47 +24,14 @@ const MONO = 'ui-monospace, "JetBrains Mono", Consolas, monospace';
 const SHEET = { W: 3508, H: 2480 };
 const DOOR_W = 900, WIN_W = 1200;
 
-// --- GLOBAL STYLES (kept from the old version: Dashboard / other modules rely on these classes) ---
+// --- GLOBAL STYLES (same tokens as the studios) ---
 const GlobalStyles = () => (
   <style>{`
-    .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
-    .sheet-preview { line-height: 0; }
-    .app-bg { background-color: #0f172a; min-height: 100vh; color: #e2e8f0; }
-    .canvas-container { 
-      background-color: #334155; 
-      overflow: hidden;
-      cursor: crosshair;
-      position: relative;
-    }
-    .sheet-preview {
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      border: 1px solid #475569;
-      background: white;
-    }
-    .tool-btn {
-      transition: all 0.2s;
-      border: 1px solid transparent;
-    }
-    .tool-btn:hover { background-color: #1e293b; }
-    .tool-btn.active {
-      background-color: #2563eb;
-      color: white;
-      border-color: #60a5fa;
-      box-shadow: 0 0 10px rgba(37, 99, 235, 0.3);
-    }
-    .dim-tooltip {
-      background: rgba(0,0,0,0.8);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      pointer-events: none;
-      white-space: nowrap;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .app-bg { background-color: #15171a; min-height: 100vh; color: #c9cfd6; }
+    .sheet-preview { line-height: 0; background: #fff; border: 1px solid #2e333a; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #15171a; }
+    ::-webkit-scrollbar-thumb { background: #2e333a; border-radius: 4px; }
   `}</style>
 );
 
@@ -437,8 +405,8 @@ function App() {
     if (activeModule === AppModule.ELEVATIONS) return (
       <ElevationStudio key={studioInitial ? 'handoff' : 'fresh'} initial={studioInitial} onClose={() => { setStudioInitial(undefined); setActiveModule(AppModule.DASHBOARD); }} />
     );
-    if (activeModule === AppModule.METHOD_STUDY) return <ComingSoon title="Method study" icon="method" onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
-    if (activeModule === AppModule.PHYSICS) return <ComingSoon title="Building physics" icon="physics" onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
+    if (activeModule === AppModule.METHOD_STUDY) return <MethodStudy onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
+    if (activeModule === AppModule.PHYSICS) return <PhysicsLab onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
     if (activeModule === AppModule.MEASUREMENT) return <MeasurementModule project={project} onClose={() => setActiveModule(AppModule.DASHBOARD)} />;
 
     return (

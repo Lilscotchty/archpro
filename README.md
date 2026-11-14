@@ -7,6 +7,8 @@ A browser-based construction toolkit built with React, Vite and TypeScript.
 | **Drawings & Simulation** | Trace a plan, draw grids/walls and generate a foundation plan sheet. |
 | **Elevation Studio** *(new)* | Upload a plan (image or PDF) and generate **front, rear, left and right elevations** as black-and-white line drawings. |
 | **Calculation & Measurement** | SMM7 bill-of-quantities take-off. |
+| **Method Study** | Construction programme with critical path (Gantt) and a site risk register, both exportable to CSV. |
+| **Building Physics** | U-value and heat loss, one-way slab / beam load take-down, and an editable embodied-carbon estimate. |
 
 ## Elevation Studio
 
