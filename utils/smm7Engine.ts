@@ -77,3 +77,61 @@ export const generateSMM7BoQ = (
 
   return boq;
 };
+
+/**
+ * Substructure items that follow from the same trench length as the strip foundation:
+ * blockwork up to DPC, damp-proof course, filling and disposal of surplus excavated material.
+ * wallHeightM = height of wall from top of concrete to DPC (metres).
+ */
+export const generateSubstructureBoQ = (
+  lengthMeters: number,
+  settings: ProjectSettings,
+  wallHeightM: number
+): BoQItem[] => {
+  const depth = settings.foundationDepth / 1000;
+  const width = settings.trenchWidth / 1000;
+  const footingW = settings.footingWidth / 1000;
+  const wallT = settings.wallWidth / 1000;
+  const concreteThickness = 0.225; // keep in step with generateSMM7BoQ
+
+  const excavVol = lengthMeters * width * depth;
+  const concreteVol = lengthMeters * footingW * concreteThickness;
+  const wallBelowGround = lengthMeters * wallT * Math.max(0, depth - concreteThickness);
+  const filling = Math.max(0, excavVol - concreteVol - wallBelowGround);
+  const disposal = Math.max(0, excavVol - filling);
+  const r2 = (n: number) => parseFloat(n.toFixed(2));
+  const wallMm = Math.round(settings.wallWidth);
+
+  const out: BoQItem[] = [];
+  if (wallHeightM > 0) {
+    out.push({
+      code: 'F10.1.1',
+      description: `Blockwork in foundation walls; ${wallMm}mm thick; in cement mortar; vertical, straight.`,
+      quantity: r2(lengthMeters * wallHeightM),
+      unit: 'm2',
+    });
+    out.push({
+      code: 'J40.1.1',
+      description: `Damp-proof course; horizontal; width ${wallMm}mm; bedded in cement mortar.`,
+      quantity: r2(lengthMeters * wallT),
+      unit: 'm2',
+    });
+  }
+  if (filling > 0) {
+    out.push({
+      code: 'D20.9.1',
+      description: 'Filling to excavations with excavated material; deposited in layers and compacted.',
+      quantity: r2(filling),
+      unit: 'm3',
+    });
+  }
+  if (disposal > 0) {
+    out.push({
+      code: 'D20.6.1',
+      description: 'Disposal of surplus excavated material; off site.',
+      quantity: r2(disposal),
+      unit: 'm3',
+    });
+  }
+  return out;
+};
