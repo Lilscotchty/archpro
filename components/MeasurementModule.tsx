@@ -1,147 +1,94 @@
 // components/MeasurementModule.tsx
-import React, { useState } from 'react';
-import { ProjectState, BoQItem } from '../types';
-import { generateSMM7BoQ } from '../utils/smm7Engine';
-import { Empty, Field, Icon, Panel, Rail, Screen, Section, StatusBar, Tag, UI, MONO, boxCls, btnGhost, btnPrimary, inputCls } from './ui';
+// SMM7 measurement and estimating: plan data (or AI-read drawings) -> take-off -> priced bill -> summary.
+import React, { useRef, useState } from 'react';
+import { ProjectState } from '../types';
+import { useBoqState, Saved } from './measurement/useBoqState';
+import { SetupPanel } from './measurement/SetupPanel';
+import { SchedulePanel } from './measurement/SchedulePanel';
+import { AiPanel } from './measurement/AiPanel';
+import { BillView } from './measurement/BillView';
+import { SummaryView } from './measurement/SummaryView';
+import { RatesView } from './measurement/RatesView';
+import { fmt } from './measurement/fields';
+import { Icon, Panel, Rail, Screen, Section, StatusBar, UI, MONO, btnGhost, btnPrimary } from './ui';
+import { billCsv, download, printBill } from '../utils/boq/export';
 
-interface MeasurementModuleProps {
-  project: ProjectState;
-  onClose: () => void;
-}
+type Tab = 'setup' | 'schedule' | 'ai' | 'bill' | 'summary' | 'rates';
+const TITLES: Record<Tab, string> = { setup: 'Setup', schedule: 'Schedule', ai: 'AI drawing reader', bill: 'Bill of quantities', summary: 'Summary', rates: 'Rates' };
 
-export const MeasurementModule: React.FC<MeasurementModuleProps> = ({ project, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'manual' | 'import'>('manual');
-  
-  // Local state for manual override
-  const [manualLength, setManualLength] = useState(0);
-  const [manualDepth, setManualDepth] = useState(project.settings.foundationDepth / 1000); // default from settings
-  const [manualWidth, setManualWidth] = useState(project.settings.trenchWidth / 1000);
-  
-  const [boq, setBoq] = useState<BoQItem[]>([]);
+interface Props { project: ProjectState; onClose: () => void }
 
-  const handleCalculate = () => {
-    // 1. Prepare Settings for Engine
-    // We create a temporary settings object because the engine expects mm, 
-    // but this UI might manipulate meters.
-    const calcSettings = {
-      ...project.settings,
-      foundationDepth: manualDepth * 1000, 
-      trenchWidth: manualWidth * 1000,
-      // concreteGrade is taken from global settings
-    };
+export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
+  const s = useBoqState(project);
+  const [tab, setTab] = useState<Tab>(() => (s.built.lines.length ? 'bill' : 'setup'));
+  const fileRef = useRef<HTMLInputElement>(null);
+  const hasPlan = project.elements.some(e => (e.type as string) === 'wall');
+  const approx = s.built.lines.filter(l => l.basis === 'approx').length;
+  const slug = (s.assumptions.projectName || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    // 2. Determine Source Data
-    const lengthToUse = activeTab === 'manual' ? manualLength : (project.calculatedTrenchLength || 0);
-
-    // 3. Run Engine
-    const results = generateSMM7BoQ(lengthToUse, calcSettings);
-    setBoq(results);
+  const openFile = async (f: File | undefined) => {
+    if (!f) return;
+    try { const j = JSON.parse(await f.text()) as Saved; if (!j.assumptions || !j.model) throw new Error(); s.load(j); }
+    catch { alert('That file is not an ArchPro estimate.'); }
+    if (fileRef.current) fileRef.current.value = '';
   };
-
-  const downloadCSV = () => {
-    if (boq.length === 0) return;
-    const headers = "Code,Description,Quantity,Unit\n";
-    const rows = boq.map(item => `${item.code},"${item.description}",${item.quantity},${item.unit}`).join("\n");
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `SMM7_TakeOff_${Date.now()}.csv`;
-    a.click();
-  };
-
-  const num = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
-  const hasLayout = !!project.calculatedTrenchLength;
 
   return (
     <Screen
-      crumb="Measurement / SMM7"
+      crumb={`Measurement / SMM7 / ${TITLES[tab]}`}
       onHome={onClose}
-      actions={
-        <>
-          <button onClick={downloadCSV} disabled={boq.length === 0} className={btnGhost}><span className="inline-flex items-center gap-1.5"><Icon n="download" s={14} />Export CSV</span></button>
-          <button onClick={handleCalculate} className={btnPrimary}>Generate bill of quantities</button>
-        </>
-      }
+      actions={<>
+        <button className={btnGhost} onClick={() => fileRef.current?.click()}>Open</button>
+        <button className={btnGhost} onClick={() => download(`${slug}-estimate.json`, JSON.stringify(s.snapshot(), null, 2), 'application/json')}>Save</button>
+        <button className={btnGhost} disabled={!s.summary.sections.length} onClick={() => download(`${slug}-bill-of-quantities.csv`, billCsv(s.summary, s.markups, s.assumptions))}><span className="inline-flex items-center gap-1.5"><Icon n="download" s={14} />CSV</span></button>
+        <button className={btnPrimary} disabled={!s.summary.sections.length} onClick={() => printBill(s.summary, s.markups, s.assumptions, s.built.geo.gfaM2)}>Print / PDF</button>
+        <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={e => openFile(e.target.files?.[0])} />
+      </>}
     >
       <div className="flex-1 flex min-h-0">
-        <Rail value={activeTab} onChange={id => setActiveTab(id as 'manual' | 'import')} items={[
-          { id: 'manual', icon: 'measure', label: 'Manual input' },
-          { id: 'import', icon: 'drawings', label: 'From drafting' },
+        <Rail value={tab} onChange={id => setTab(id as Tab)} items={[
+          { id: 'setup', icon: 'setup', label: 'Setup and assumptions' },
+          { id: 'schedule', icon: 'table', label: 'Walls, openings, columns' },
+          { id: 'ai', icon: 'spark', label: 'AI drawing reader' },
+          { id: 'bill', icon: 'measure', label: 'Bill of quantities' },
+          { id: 'summary', icon: 'sum', label: 'Summary' },
+          { id: 'rates', icon: 'coins', label: 'Rates' },
         ]} />
-
-        {/* ---------------- results */}
         <main className="flex-1 min-w-0 overflow-auto p-6" style={{ background: UI.bg }}>
-          {boq.length > 0 ? (
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold" style={{ color: '#e6e9ed' }}>Bill of quantities</h2>
-                <Tag tone="ok">SMM7</Tag>
-              </div>
-              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b">
-                    <tr>
-                      <th className="px-3 py-2 w-24 font-medium">Ref</th>
-                      <th className="px-3 py-2 font-medium">Description</th>
-                      <th className="px-3 py-2 w-28 text-right font-medium">Quantity</th>
-                      <th className="px-3 py-2 w-16 font-medium">Unit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {boq.map((item, idx) => (
-                      <tr key={idx} style={{ borderColor: UI.rule }} className="border-b last:border-b-0 hover:bg-white/[0.03]">
-                        <td className="px-3 py-2.5" style={{ fontFamily: MONO, color: UI.warn }}>{item.code}</td>
-                        <td className="px-3 py-2.5">{item.description}</td>
-                        <td className="px-3 py-2.5 text-right" style={{ fontFamily: MONO, color: '#e6e9ed' }}>{item.quantity}</td>
-                        <td className="px-3 py-2.5" style={{ color: UI.dim, fontFamily: MONO }}>{item.unit}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-2 text-[11px]" style={{ color: UI.dim }}>Generated by the ArchPro SMM7 engine · {boq.length} items</div>
-            </div>
-          ) : (
-            <Empty icon="measure" title="Ready to calculate" hint="Enter dimensions or use drafting data, then generate the bill of quantities." />
-          )}
+          {tab === 'setup' && <SetupPanel s={s} />}
+          {tab === 'schedule' && <SchedulePanel s={s} hasPlan={hasPlan} />}
+          {tab === 'ai' && <AiPanel s={s} onApplied={() => setTab('schedule')} />}
+          {tab === 'bill' && <BillView s={s} />}
+          {tab === 'summary' && <SummaryView s={s} />}
+          {tab === 'rates' && <RatesView s={s} />}
         </main>
-        {/* ---------------- properties */}
         <Panel>
-          {activeTab === 'manual' ? (
-            <Section title="Trench">
-              <Field label="Total trench length (m)"><input type="number" className={inputCls} value={manualLength} onChange={e => setManualLength(num(e.target.value))} placeholder="0.00" /></Field>
-              <Field label="Average depth (m)"><input type="number" className={inputCls} value={manualDepth} onChange={e => setManualDepth(num(e.target.value))} /></Field>
-              <Field label="Trench width (m)"><input type="number" className={inputCls} value={manualWidth} onChange={e => setManualWidth(num(e.target.value))} /></Field>
-            </Section>
-          ) : (
-            <Section title="Drafting data">
-              <div className={boxCls}>
-                <div className="text-xs" style={{ color: UI.dim }}>Net trench length</div>
-                {hasLayout ? (
-                  <>
-                    <div className="mt-1 text-2xl" style={{ fontFamily: MONO, color: '#e6e9ed' }}>{project.calculatedTrenchLength!.toFixed(2)}<span className="text-sm" style={{ color: UI.dim }}> m</span></div>
-                    <div className="mt-1 text-[11px]" style={{ color: UI.dim }}>Calculated from the Drafting studio.</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mt-1 font-semibold" style={{ color: UI.danger }}>No data yet</div>
-                    <div className="mt-1 text-[11px]" style={{ color: UI.dim }}>Open the Drafting studio and generate a foundation plan first.</div>
-                  </>
-                )}
-              </div>
-              {hasLayout && (
-                <div className={`${boxCls} text-xs space-y-1`} style={{ fontFamily: MONO }}>
-                  <div className="flex justify-between"><span style={{ color: UI.dim }}>Depth</span><span>{project.settings.foundationDepth / 1000} m</span></div>
-                  <div className="flex justify-between"><span style={{ color: UI.dim }}>Width</span><span>{project.settings.trenchWidth / 1000} m</span></div>
-                  <div className="flex justify-between"><span style={{ color: UI.dim }}>Concrete</span><span>{project.settings.concreteGrade}</span></div>
-                </div>
-              )}
-            </Section>
-          )}
+          <Section title="Key figures">
+            <div className="text-xs space-y-1.5" style={{ fontFamily: MONO }}>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Net works</span><span>{fmt(s.summary.net, 0)}</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Tender total</span><span style={{ color: '#e6e9ed' }}>{fmt(s.summary.grand, 0)}</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Per m2 GFA</span><span>{fmt(s.summary.perM2, 0)}</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Currency</span><span>{s.assumptions.currency}</span></div>
+            </div>
+          </Section>
+          <Section title="Take-off">
+            <div className="text-xs space-y-1.5" style={{ fontFamily: MONO }}>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>GFA</span><span>{s.built.geo.gfaM2.toFixed(1)} m2</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Net floor / storey</span><span>{s.built.geo.aNetM2.toFixed(1)} m2</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>External walls</span><span>{s.built.geo.extLenM.toFixed(1)} m</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Bill items</span><span>{s.built.lines.length + s.customs.length}</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Approximate items</span><span style={{ color: approx ? UI.warn : UI.text }}>{approx}</span></div>
+            </div>
+          </Section>
+          <Section title="Data">
+            <div className="text-[11px]" style={{ color: UI.dim }}>
+              {s.saveError ? <span style={{ color: UI.danger }}>Autosave failed: browser storage is full or blocked. Use Save to keep your work.</span> : 'Autosaved in this browser. Save writes a file you can reopen.'}
+            </div>
+            <button className={btnGhost + ' w-full'} onClick={() => { if (confirm('Clear the whole estimate (schedule, assumptions, rates, edits)?')) s.resetAll(); }}>Start a new estimate</button>
+          </Section>
         </Panel>
       </div>
-      <StatusBar left={<span style={{ color: UI.text }}>{activeTab === 'manual' ? 'Manual input' : 'From drafting'}</span>} right={<span>{boq.length ? `${boq.length} items` : 'no results yet'}</span>} />
+      <StatusBar left={<span style={{ color: UI.text }}>{TITLES[tab]}</span>} right={<span>{s.built.lines.length ? `${s.built.lines.length} items · ${s.assumptions.currency} ${fmt(s.summary.grand, 0)}` : 'no quantities yet'}</span>} />
     </Screen>
   );
 };
