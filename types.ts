@@ -37,6 +37,8 @@ export interface ArchElement {
   x2: number;
   y2: number;
   gridRef: string; // e.g., "A-1" to "A-2"
+  sill?: number;   // mm – windows only (3D model)
+  height?: number; // mm – doors / windows (3D model)
 }
 
 export interface RoofSettings {
@@ -62,6 +64,7 @@ export interface ProjectSettings {
   blindingOffset: number;
   foundationDepth: number; // mm
   concreteGrade: string;
+  mmPerUnit?: number; // millimetres represented by one drawing unit (1 on a blank sheet)
 }
 
 export interface BoQItem {
