@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { MethodStudy } from './components/MethodStudy';
 import { PhysicsLab } from './components/PhysicsLab';
@@ -7,6 +7,10 @@ import { saveFromDrafting } from './utils/drawings/pack';
 import { AppStep, ProjectState, AppModule } from './types';
 import { ElevationStudio } from './components/elevation/ElevationStudio';
 import type { ElevationStudioProps } from './components/elevation/ElevationStudio';
+import { expandWalls, hostWall } from './utils/sim/plan';
+
+// The 3D editor pulls in the PlayCanvas engine, so it is only downloaded when the 3D tab is opened.
+const Simulation3D = React.lazy(() => import('./components/sim/Simulation3D'));
 
 // Derived from ProjectState so this file never depends on extra exports from ./types
 type ArchElement = ProjectState['elements'][number];
@@ -106,6 +110,7 @@ function App() {
   const [sheet, setSheet] = useState<{ title: string; src: string } | null>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [studioInitial, setStudioInitial] = useState<ElevationStudioProps['initial']>(undefined);
+  const [mode, setMode] = useState<'plan' | '3d'>('plan');
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -120,7 +125,9 @@ function App() {
     activeModule !== AppModule.ELEVATIONS &&
     activeModule !== AppModule.METHOD_STUDY &&
     activeModule !== AppModule.PHYSICS;
-  const drafting = inWorkspace && (step === AppStep.GRID_MAPPING || step === AppStep.PLAN_DESIGN);
+  const inStudio = inWorkspace && (step === AppStep.GRID_MAPPING || step === AppStep.PLAN_DESIGN);
+  const drafting = inStudio && mode === 'plan';          // the 2D canvas is on screen
+  const mmPerUnit = project.settings.mmPerUnit ?? 1;      // real millimetres per drawing unit
 
   // ---------- model helpers ----------
   const commit = useCallback((fn: (p: ProjectState) => ProjectState) => {
@@ -218,7 +225,7 @@ function App() {
       const on = e.id === sel;
       const kind = kindOf(e);
       if (kind === 'wall' && layers.walls) {
-        const a = Math.atan2(e.y2 - e.y1, e.x2 - e.x1), t = project.settings.wallWidth / 2;
+        const a = Math.atan2(e.y2 - e.y1, e.x2 - e.x1), t = project.settings.wallWidth / mmPerUnit / 2;
         const nx = -Math.sin(a) * t, ny = Math.cos(a) * t;
         ctx.beginPath(); ctx.moveTo(e.x1 + nx, e.y1 + ny); ctx.lineTo(e.x2 + nx, e.y2 + ny); ctx.lineTo(e.x2 - nx, e.y2 - ny); ctx.lineTo(e.x1 - nx, e.y1 - ny); ctx.closePath();
         ctx.fillStyle = on ? 'rgba(74,163,255,.25)' : 'rgba(232,234,237,.1)'; ctx.fill();
@@ -231,16 +238,19 @@ function App() {
       } else if (kind === 'rect' && layers.walls) {
         ctx.strokeStyle = on ? C.accent : C.wall; ctx.lineWidth = lw(1.4);
         const w = e.x2 - e.x1, h = e.y2 - e.y1; ctx.fillStyle = on ? 'rgba(74,163,255,.2)' : 'rgba(232,234,237,.06)'; ctx.fillRect(e.x1, e.y1, w, h); ctx.strokeRect(e.x1, e.y1, w, h);
-      } else if (kind === 'door' && layers.openings) {
-        const w = Math.abs(e.x2 - e.x1) || DOOR_W;
-        ctx.strokeStyle = on ? C.accent : C.door; ctx.lineWidth = lw(1.4);
-        ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x1, e.y1 - w); ctx.stroke();
-        ctx.beginPath(); ctx.arc(e.x1, e.y1, w, -Math.PI / 2, 0); ctx.stroke();
-      } else if (kind === 'window' && layers.openings) {
-        const w = Math.abs(e.x2 - e.x1) || WIN_W, t = project.settings.wallWidth;
-        ctx.strokeStyle = on ? C.accent : C.win; ctx.lineWidth = lw(1.4);
-        ctx.strokeRect(e.x1, e.y1 - t / 2, w, t);
-        ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x1 + w, e.y1); ctx.stroke();
+      } else if ((kind === 'door' || kind === 'window') && layers.openings) {
+        // symbols follow the segment (x1,y1)->(x2,y2) so they sit on walls in any direction
+        const L = Math.hypot(e.x2 - e.x1, e.y2 - e.y1) || (kind === 'door' ? DOOR_W : WIN_W) / mmPerUnit;
+        const ux = (e.x2 - e.x1) / L || 1, uy = (e.y2 - e.y1) / L || 0, nx = -uy, ny = ux;
+        ctx.strokeStyle = on ? C.accent : kind === 'door' ? C.door : C.win; ctx.lineWidth = lw(1.4);
+        if (kind === 'door') {
+          ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x1 + nx * L, e.y1 + ny * L); ctx.stroke();      // leaf
+          const a0 = Math.atan2(uy, ux); ctx.beginPath(); ctx.arc(e.x1, e.y1, L, a0, a0 + Math.PI / 2); ctx.stroke(); // swing
+        } else {
+          const t = project.settings.wallWidth / mmPerUnit, h = t / 2;
+          ctx.beginPath(); ctx.moveTo(e.x1 + nx * h, e.y1 + ny * h); ctx.lineTo(e.x2 + nx * h, e.y2 + ny * h); ctx.lineTo(e.x2 - nx * h, e.y2 - ny * h); ctx.lineTo(e.x1 - nx * h, e.y1 - ny * h); ctx.closePath(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+        }
       }
     });
 
@@ -289,6 +299,18 @@ function App() {
     setStart(tool === 'wall' ? p : null); // walls chain like a polyline
   };
 
+  // Doors and windows snap onto the nearest wall, centred on the click and aligned with it.
+  const placeOpening = (kind: 'door' | 'window', raw: Pt) => {
+    const W = (kind === 'door' ? DOOR_W : WIN_W) / mmPerUnit;
+    const host = hostWall(raw, expandWalls(project.elements as any), Math.max(60 / view.z, project.settings.wallWidth / mmPerUnit));
+    if (!host) { addEl({ type: kind, x1: raw.x - W / 2, y1: raw.y, x2: raw.x + W / 2, y2: raw.y }); return; }
+    const L = Math.hypot(host.w.x2 - host.w.x1, host.w.y2 - host.w.y1) || 1;
+    let ux = (host.w.x2 - host.w.x1) / L, uy = (host.w.y2 - host.w.y1) / L;
+    if (ux < 0 || (ux === 0 && uy < 0)) { ux = -ux; uy = -uy; }
+    const w = Math.min(W, L * 0.9), c = host.q;
+    addEl({ type: kind, x1: c.x - ux * w / 2, y1: c.y - uy * w / 2, x2: c.x + ux * w / 2, y2: c.y + uy * w / 2 });
+  };
+
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>): void => {
     const s = local(e);
     if (e.button === 1 || tool === 'pan' || spaceDown.current) {
@@ -303,7 +325,9 @@ function App() {
       for (const el of project.elements) {
         const near = kindOf(el) === 'wall'
           ? segDist(p, { x: el.x1, y: el.y1 }, { x: el.x2, y: el.y2 }) < Math.max(r, project.settings.wallWidth / 2)
-          : dist(p, { x: el.x1, y: el.y1 }) < Math.max(r, 500);
+          : (kindOf(el) === 'door' || kindOf(el) === 'window')
+            ? segDist(p, { x: el.x1, y: el.y1 }, { x: el.x2, y: el.y2 }) < Math.max(r, project.settings.wallWidth / mmPerUnit)
+            : dist(p, { x: el.x1, y: el.y1 }) < Math.max(r, 500);
         if (near) hit = el.id;
       }
       for (const g of project.gridLines) {
@@ -312,8 +336,7 @@ function App() {
       setSel(hit);
       return;
     }
-    if (tool === 'door') { addEl({ type: 'door', x1: p.x, y1: p.y, x2: p.x + DOOR_W, y2: p.y }); return; }
-    if (tool === 'window') { addEl({ type: 'window', x1: p.x, y1: p.y, x2: p.x + WIN_W, y2: p.y }); return; }
+    if (tool === 'door' || tool === 'window') { placeOpening(tool, toWorld(s.x, s.y)); return; }
     if (!start) { setStart(p); return; }
     finish(p);
   };
@@ -424,13 +447,20 @@ function App() {
           <button onClick={() => setActiveModule(AppModule.DASHBOARD)} className="font-semibold tracking-tight hover:text-white" title="Back to dashboard">ArchPro</button>
           <span style={{ color: C.dim }}>/ Drafting studio</span>
           <div className="flex-1" />
-          {drafting && <>
+          {inStudio && (
+            <div style={{ borderColor: C.rule, background: C.bg }} className="flex p-0.5 border rounded-[3px] mr-2">
+              {([['plan', '2D plan'], ['3d', '3D model']] as const).map(([id, label]) => (
+                <button key={id} onClick={() => { setMode(id); setStart(null); }} style={{ background: mode === id ? C.accent : 'transparent', color: mode === id ? '#06121f' : C.text }} className="px-3 py-1 text-xs rounded-[3px] font-medium">{label}</button>
+              ))}
+            </div>
+          )}
+          {inStudio && <>
             <button onClick={openFoundationSheet} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Foundation plan</button>
             <button onClick={openElevationStudio} style={{ borderColor: C.rule }} className="px-3 py-1.5 border rounded-[3px] hover:bg-white/5">Elevations</button>
           </>}
         </header>
 
-        {!drafting ? (
+        {!inStudio ? (
           <main className="flex-1 grid place-items-center">
             <div className="w-[520px] grid grid-cols-2 gap-4">
               <label style={{ background: C.panel, borderColor: C.rule }} className="border rounded-[3px] p-6 cursor-pointer hover:border-[#4aa3ff]">
@@ -442,6 +472,10 @@ function App() {
               </button>
             </div>
           </main>
+        ) : mode === '3d' ? (
+          <Suspense fallback={<div className="flex-1 grid place-items-center text-xs" style={{ color: C.dim, fontFamily: MONO }}>Loading 3D engine…</div>}>
+            <Simulation3D project={project} selectedId={sel} onSelect={setSel} onChange={commit} />
+          </Suspense>
         ) : (
           <div className="flex-1 flex min-h-0">
             {/* tool palette */}
@@ -481,6 +515,8 @@ function App() {
               <Section title="Building heights (mm)">
                 <Num label="Floor height" value={project.specs.floorHeight} onChange={n => setProject(p => ({ ...p, specs: { ...p.specs, floorHeight: n } }))} />
                 <Num label="Plinth height" value={project.specs.plinthHeight} onChange={n => setProject(p => ({ ...p, specs: { ...p.specs, plinthHeight: n } }))} />
+                <Num label="Floors" value={project.specs.floors} onChange={n => setProject(p => ({ ...p, specs: { ...p.specs, floors: Math.max(1, Math.min(8, Math.round(n) || 1)) } }))} />
+                <Num label="mm per drawing unit" value={mmPerUnit} onChange={n => setProject(p => ({ ...p, settings: { ...p.settings, mmPerUnit: n > 0 ? n : 1 } }))} />
               </Section>
             </aside>
           </div>
