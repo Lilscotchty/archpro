@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
            </div>
 
            {/* OPTION 1: UPLOAD */}
-           <div className="p-6 bg-[var(--ui-raised)] rounded-[3px] border border-[var(--ui-rule)] border-dashed text-center hover:bg-[var(--ui-raised)] transition-colors cursor-pointer group relative overflow-hidden">
+           <div className="p-6 bg-[var(--ui-raised)] rounded-[var(--ui-r)] border border-[var(--ui-rule)] border-dashed text-center hover:bg-[var(--ui-raised)] transition-colors cursor-pointer group relative overflow-hidden">
               <input type="file" id="planUpload" className="hidden" accept="image/*" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
            {/* OPTION 2: DRAW FROM SCRATCH */}
            <button 
              onClick={onStartBlank}
-             className="w-full p-6 bg-[var(--ui-raised)] rounded-[3px] border border-[var(--ui-rule)] hover:border-emerald-500/50 hover:bg-[var(--ui-raised)] transition-all cursor-pointer group text-center"
+             className="w-full p-6 bg-[var(--ui-raised)] rounded-[var(--ui-r)] border border-[var(--ui-rule)] hover:border-emerald-500/50 hover:bg-[var(--ui-raised)] transition-all cursor-pointer group text-center"
            >
               <div className="w-14 h-14 bg-emerald-600/20 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform text-2xl text-emerald-400">✏️</div>
               <span className="text-sm text-[var(--ui-strong)] font-bold block mb-1">Draw from Scratch</span>
@@ -98,22 +98,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* --- DESIGN TOOLS --- */}
       {step === AppStep.GRID_MAPPING && (
         <div className="space-y-4 ">
-          <div className="bg-[var(--ui-raised)] p-3 rounded-[3px] mb-4">
+          <div className="bg-[var(--ui-raised)] p-3 rounded-[var(--ui-r)] mb-4">
              <h3 className="text-xs font-bold text-[var(--ui-dim)] uppercase mb-2">Step 1: Grid System</h3>
              <p className="text-xs text-[var(--ui-dim)]">Lay out your grid lines first. These will act as the skeleton for your walls and columns.</p>
           </div>
 
           <div className="space-y-2">
-             <button onClick={() => setCurrentTool('v-line')} className={`w-full text-left p-3 rounded-[3px] border border-transparent flex items-center gap-3 ${currentTool === 'v-line' ? 'bg-[var(--ui-accent)] text-white' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
+             <button onClick={() => setCurrentTool('v-line')} className={`w-full text-left p-3 rounded-[var(--ui-r)] border border-transparent flex items-center gap-3 ${currentTool === 'v-line' ? 'bg-[var(--ui-accent)] text-white' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
                <span className="font-mono opacity-50">|</span> Vertical Grid
              </button>
-             <button onClick={() => setCurrentTool('h-line')} className={`w-full text-left p-3 rounded-[3px] border border-transparent flex items-center gap-3 ${currentTool === 'h-line' ? 'bg-[var(--ui-accent)] text-white' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
+             <button onClick={() => setCurrentTool('h-line')} className={`w-full text-left p-3 rounded-[var(--ui-r)] border border-transparent flex items-center gap-3 ${currentTool === 'h-line' ? 'bg-[var(--ui-accent)] text-white' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
                <span className="font-mono opacity-50">—</span> Horizontal Grid
              </button>
           </div>
 
           <div className="pt-4 border-t border-[var(--ui-rule)] mt-4">
-            <button onClick={() => setStep(AppStep.PLAN_DESIGN)} className="w-full py-3 bg-[var(--ui-accent)] hover:bg-[var(--ui-accent)] rounded-[3px] font-bold text-white ">
+            <button onClick={() => setStep(AppStep.PLAN_DESIGN)} className="w-full py-3 bg-[var(--ui-accent)] hover:bg-[var(--ui-accent)] rounded-[var(--ui-r)] font-bold text-white ">
               Next: Design Plan →
             </button>
           </div>
@@ -123,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {step === AppStep.PLAN_DESIGN && (
          <div className="flex flex-col h-full ">
            {/* BUILDING SPECS */}
-           <div className="bg-[var(--ui-raised)] p-4 rounded-[3px] mb-6 space-y-3">
+           <div className="bg-[var(--ui-raised)] p-4 rounded-[var(--ui-r)] mb-6 space-y-3">
              <h3 className="text-xs font-bold text-[var(--ui-accent)] uppercase">Building Specs</h3>
              <div className="flex justify-between items-center">
                <span className="text-sm">Floors</span>
@@ -151,19 +151,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
            {/* TOOLBOX */}
            <div className="space-y-2 mb-auto">
              <h3 className="text-xs font-bold text-[var(--ui-dim)] uppercase mb-2">Architectural Tools</h3>
-             <button onClick={() => setCurrentTool('wall')} className={`w-full text-left p-3 rounded-[3px] flex items-center gap-3 transition-all ${currentTool === 'wall' ? 'bg-[var(--ui-accent)] text-white ' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
+             <button onClick={() => setCurrentTool('wall')} className={`w-full text-left p-3 rounded-[var(--ui-r)] flex items-center gap-3 transition-all ${currentTool === 'wall' ? 'bg-[var(--ui-accent)] text-white ' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
                <span className="w-4 h-4 bg-white border border-black"></span> Wall (225mm)
              </button>
-             <button onClick={() => setCurrentTool('door')} className={`w-full text-left p-3 rounded-[3px] flex items-center gap-3 transition-all ${currentTool === 'door' ? 'bg-[var(--ui-accent)] text-white ' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
+             <button onClick={() => setCurrentTool('door')} className={`w-full text-left p-3 rounded-[var(--ui-r)] flex items-center gap-3 transition-all ${currentTool === 'door' ? 'bg-[var(--ui-accent)] text-white ' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
                <span className="w-4 h-4 rounded-t-full border border-white"></span> Door
              </button>
-             <button onClick={() => setCurrentTool('window')} className={`w-full text-left p-3 rounded-[3px] flex items-center gap-3 transition-all ${currentTool === 'window' ? 'bg-[var(--ui-accent)] text-white ' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
+             <button onClick={() => setCurrentTool('window')} className={`w-full text-left p-3 rounded-[var(--ui-r)] flex items-center gap-3 transition-all ${currentTool === 'window' ? 'bg-[var(--ui-accent)] text-white ' : 'hover:bg-[var(--ui-raised)] text-[var(--ui-text)]'}`}>
                <span className="w-4 h-2 border border-white"></span> Window
              </button>
            </div>
 
            {/* ACTION */}
-           <button onClick={onGenerate} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-[3px] font-bold text-white   mt-4">
+           <button onClick={onGenerate} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-[var(--ui-r)] font-bold text-white   mt-4">
              Auto-Generate Set
            </button>
         </div>

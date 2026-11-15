@@ -25,11 +25,11 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
 
   return (
     <div className="max-w-6xl mx-auto grid gap-4">
-      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.danger, 53), color: UI.danger }}>{w}</div> : null; })()}
-      {(s.model.walls.some(w => w.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) && <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>Quantities include values the AI read from the drawing. Check the Schedule tab against the drawing, then confirm the Setup assumptions (foundation depth, roof, finishes) that the drawing does not show.</div>}
-      {s.built.geo.warnings.map((w, i) => <div key={i} className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>{w}</div>)}
+      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.danger, 24), background: tint(UI.danger, 6), color: UI.danger }}>{w}</div> : null; })()}
+      {(s.model.walls.some(w => w.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) && <div className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>Quantities include values the AI read from the drawing. Check the Schedule tab against the drawing, then confirm the Setup assumptions (foundation depth, roof, finishes) that the drawing does not show.</div>}
+      {s.built.geo.warnings.map((w, i) => <div key={i} className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>{w}</div>)}
       {total.map(sec => (
-        <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+        <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: UI.rule, background: UI.raised }}>
             <div className="text-xs font-semibold" style={{ color: 'var(--ui-strong)' }}><span style={{ fontFamily: MONO, color: UI.warn }}>{sec.code}</span> &nbsp; {sec.title}</div>
             <div className="text-xs" style={{ fontFamily: MONO }}>{cur} {fmt(sec.total)}</div>
@@ -80,7 +80,7 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
         </div>
       ))}
 
-      <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] p-3">
+      <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] p-3">
         <div className="text-xs font-semibold mb-2" style={{ color: 'var(--ui-strong)' }}>Add your own item</div>
         <div className="grid grid-cols-12 gap-2 items-end">
           <div className="col-span-3"><Select value={nl.section} onChange={v => setNl({ ...nl, section: v })} options={SECTIONS.map(x => [x.code, `${x.code} ${x.title}`] as [string, string])} /></div>

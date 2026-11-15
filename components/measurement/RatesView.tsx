@@ -26,7 +26,7 @@ export const RatesView: React.FC<{ s: BoqState }> = ({ s }) => {
   const keys = Object.keys(s.rates).filter(k => (k + s.rates[k].label).toLowerCase().includes(q.toLowerCase())).sort();
   return (
     <div className="max-w-4xl mx-auto grid gap-3">
-      <div className="border rounded-[3px] p-3 text-xs" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>
+      <div className="border rounded-[var(--ui-r)] p-3 text-xs" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>
         Rates with no date are placeholders so the bill is not blank. They are not a price list. {placeholders} of {Object.keys(s.rates).length} rates are still placeholders. Type your own, or import a CSV of your supplier and subcontractor prices (Export first to get the layout: key, item, unit, rate, source, updated). Rates you enter are dated and marked as yours.
       </div>
       <div className="flex gap-2 items-center flex-wrap">
@@ -44,7 +44,7 @@ export const RatesView: React.FC<{ s: BoqState }> = ({ s }) => {
         <button className={btnPrimary} onClick={() => { if (mul > 0) s.setRates(r => Object.fromEntries((Object.entries(r) as [string, RateItem][]).map(([k, v]) => [k, { ...v, rate: Math.round(v.rate * mul * 100) / 100 }]))); setMul(1); }}>Apply</button>
         <button className={btnGhost} onClick={() => { if (confirm('Restore all rates to the placeholder defaults?')) s.setRates(DEFAULT_RATES); }}>Restore defaults</button>
       </div>
-      <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+      <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
         <table className="w-full text-xs">
           <thead style={{ color: UI.dim }}><tr><th className="px-3 py-1.5 text-left font-medium w-36">Key</th><th className="px-2 py-1.5 text-left font-medium">Item</th><th className="px-2 py-1.5 text-left font-medium w-20">Per</th><th className="px-2 py-1.5 text-left font-medium w-44">Source / date</th><th className="px-3 py-1.5 text-right font-medium w-32">Rate ({s.assumptions.currency})</th></tr></thead>
           <tbody>

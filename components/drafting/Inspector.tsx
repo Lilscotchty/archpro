@@ -24,7 +24,7 @@ export const Inspector: React.FC<{ project: ProjectState; sel: Set<string>; comm
           <div className="flex justify-between"><span style={{ color: UI.dim }}>Total wall length</span><span>{(s.totalMm / 1000).toFixed(2)} m</span></div>
         </div>
         {s.walls > 0 && s.dangling > 0 && (
-          <div className="flex gap-2 text-xs p-2 border rounded-[3px]" style={{ borderColor: tint(UI.warn, 40), color: UI.warn }}>
+          <div className="flex gap-2 text-xs p-2 border rounded-[var(--ui-r)]" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>
             <DIcon n="warn" s={14} /><span>{s.dangling} wall {s.dangling === 1 ? 'end is' : 'ends are'} not joined to another wall. Foundation and room detection need closed loops.</span>
           </div>
         )}

@@ -500,7 +500,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
   const lastMark = marks[marks.length - 1];
   const stats = useMemo(() => ({ walls: project.elements.filter(isWall).length, openings: project.elements.filter(isOpening).length }), [project.elements]);
   const cur = snapRes?.p ?? mouse;
-  const fieldCls = 'w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-2 py-1.5 text-xs font-mono text-[var(--ui-text)]';
+  const fieldCls = 'w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[var(--ui-r)] px-2 py-1.5 text-xs font-mono text-[var(--ui-text)]';
 
   const actions = started ? (
     <>
@@ -544,13 +544,13 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
                 {i > 0 && arr[i - 1].group !== x.group && <div style={{ background: UI.rule }} className="w-6 h-px my-1" />}
                 <button title={`${x.label} (${x.key})`} aria-label={x.label} onClick={() => setTool(x.id)}
                   style={{ background: tool === x.id ? UI.accent : 'transparent', color: tool === x.id ? UI.accentInk : UI.text }}
-                  className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1"><DIcon n={x.icon} /></button>
+                  className="w-9 h-9 grid place-items-center rounded-[var(--ui-r)] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1"><DIcon n={x.icon} /></button>
               </React.Fragment>
             ))}
             <div className="flex-1" />
-            <button title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!hist.canUndo} onClick={undo} className="w-9 h-9 grid place-items-center rounded-[3px] hover:bg-[var(--ui-hover)] disabled:opacity-30"><DIcon n="undo" /></button>
-            <button title="Redo (Ctrl+Y)" aria-label="Redo" disabled={!hist.canRedo} onClick={redo} className="w-9 h-9 grid place-items-center rounded-[3px] hover:bg-[var(--ui-hover)] disabled:opacity-30"><DIcon n="redo" /></button>
-            <button title="Delete (Del)" aria-label="Delete" disabled={!sel.size} onClick={deleteSel} className="w-9 h-9 grid place-items-center rounded-[3px] hover:bg-[var(--ui-hover)] disabled:opacity-30"><DIcon n="trash" /></button>
+            <button title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!hist.canUndo} onClick={undo} className="w-9 h-9 grid place-items-center rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)] disabled:opacity-30"><DIcon n="undo" /></button>
+            <button title="Redo (Ctrl+Y)" aria-label="Redo" disabled={!hist.canRedo} onClick={redo} className="w-9 h-9 grid place-items-center rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)] disabled:opacity-30"><DIcon n="redo" /></button>
+            <button title="Delete (Del)" aria-label="Delete" disabled={!sel.size} onClick={deleteSel} className="w-9 h-9 grid place-items-center rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)] disabled:opacity-30"><DIcon n="trash" /></button>
           </nav>
 
           {/* canvas */}
@@ -558,15 +558,15 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
             <canvas ref={canvasRef} tabIndex={0} style={{ width: size.w, height: size.h, touchAction: 'none', cursor: cursorStyle, outline: 'none' }} className="absolute inset-0"
               onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { if (!drag.current) { setMouse(null); setSnapRes(null); setHover(null); } }}
               onContextMenu={e => e.preventDefault()} onDoubleClick={() => { if (tool === 'wall') setStart(null); }} />
-            <div style={{ background: 'rgba(31,34,39,.94)', borderColor: UI.rule, fontFamily: MONO, left: RULER + 10, top: RULER + 10 }} className="absolute px-2.5 py-1.5 border rounded-[3px] text-[11px] max-w-[70%] pointer-events-none">{hint}</div>
+            <div style={{ background: 'rgba(31,34,39,.94)', borderColor: UI.rule, fontFamily: MONO, left: RULER + 10, top: RULER + 10 }} className="absolute px-2.5 py-1.5 border rounded-[var(--ui-r)] text-[11px] max-w-[70%] pointer-events-none">{hint}</div>
             {u && !u.calibrated && (
-              <button onClick={() => setTool('scale')} style={{ background: 'var(--ui-warnTint)', borderColor: UI.warn, color: UI.warn, top: RULER + 10 }} className="absolute right-3 px-3 py-1.5 border rounded-[3px] text-xs font-medium inline-flex items-center gap-2"><DIcon n="warn" s={14} />Scale not set. Quantities will be wrong until it is.</button>
+              <button onClick={() => setTool('scale')} style={{ background: 'var(--ui-warnTint)', borderColor: UI.warn, color: UI.warn, top: RULER + 10 }} className="absolute right-3 px-3 py-1.5 border rounded-[var(--ui-r)] text-xs font-medium inline-flex items-center gap-2"><DIcon n="warn" s={14} />Scale not set. Quantities will be wrong until it is.</button>
             )}
-            {toast && <div style={{ background: UI.panel, borderColor: UI.rule }} className="absolute left-1/2 -translate-x-1/2 bottom-14 px-4 py-2 border rounded-[3px] text-xs shadow-lg max-w-[80%]">{toast}</div>}
-            {error && <div style={{ background: UI.panel, borderColor: UI.danger, color: UI.danger }} className="absolute left-1/2 -translate-x-1/2 top-24 px-4 py-2 border rounded-[3px] text-xs max-w-[80%] cursor-pointer" onClick={() => setError('')}>{error}</div>}
+            {toast && <div style={{ background: UI.panel, borderColor: UI.rule }} className="absolute left-1/2 -translate-x-1/2 bottom-14 px-4 py-2 border rounded-[var(--ui-r)] text-xs shadow-lg max-w-[80%]">{toast}</div>}
+            {error && <div style={{ background: UI.panel, borderColor: UI.danger, color: UI.danger }} className="absolute left-1/2 -translate-x-1/2 top-24 px-4 py-2 border rounded-[var(--ui-r)] text-xs max-w-[80%] cursor-pointer" onClick={() => setError('')}>{error}</div>}
             <div className="absolute right-3 bottom-3 flex flex-col gap-1">
               {[['+', 'Zoom in', () => zoomBy(1.3)], ['−', 'Zoom out', () => zoomBy(1 / 1.3)], ['FIT', 'Zoom to drawing (F)', () => setFitTick(x => x + 1)]].map(([l, tt, fn]) => (
-                <button key={l as string} title={tt as string} onClick={fn as () => void} style={{ background: UI.panel, borderColor: UI.rule, color: UI.text }} className="w-8 h-8 border rounded-[3px] text-[11px] hover:bg-[var(--ui-rule)]">{l as string}</button>
+                <button key={l as string} title={tt as string} onClick={fn as () => void} style={{ background: UI.panel, borderColor: UI.rule, color: UI.text }} className="w-8 h-8 border rounded-[var(--ui-r)] text-[11px] hover:bg-[var(--ui-rule)]">{l as string}</button>
               ))}
             </div>
           </div>
@@ -649,7 +649,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
       {/* sheet viewer */}
       {sheet && (
         <div className="fixed inset-0 z-50 grid place-items-center" style={{ background: 'rgba(10,11,13,.8)' }} onClick={() => setSheet(null)}>
-          <div style={{ background: UI.panel, borderColor: UI.rule }} className="border rounded-[3px] max-w-[92vw] max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div style={{ background: UI.panel, borderColor: UI.rule }} className="border rounded-[var(--ui-r)] max-w-[92vw] max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: UI.rule }}>
               <span className="font-semibold">{sheet.title} <span className="font-normal text-xs" style={{ color: UI.dim }}>1:{sheet.denom} at A3</span></span>
               <span className="flex gap-2">

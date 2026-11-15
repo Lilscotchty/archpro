@@ -31,7 +31,7 @@ export const MiniPlan: React.FC<{ walls: ExtWall[]; front: PlanSide }> = ({ wall
   ].map(p => p.join(',')).join(' ');
 
   return (
-    <svg viewBox={`${minX - pad} ${minY - pad} ${W + 2 * pad} ${H + 2 * pad}`} className="w-full h-40 bg-white rounded-[3px] border border-[var(--ui-rule)]">
+    <svg viewBox={`${minX - pad} ${minY - pad} ${W + 2 * pad} ${H + 2 * pad}`} className="w-full h-40 bg-white rounded-[var(--ui-r)] border border-[var(--ui-rule)]">
       {walls.map(w => <line key={w.id} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="#000" strokeWidth={sw} strokeLinecap="square" />)}
       <line x1={arrow.x1} y1={arrow.y1} x2={arrow.x2} y2={arrow.y2} stroke="#000" strokeWidth={sw * 0.8} />
       <polygon points={head} fill="#000" />

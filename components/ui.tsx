@@ -17,11 +17,11 @@ export const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%
 export const FONT = '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
 export const MONO = 'ui-monospace, "IBM Plex Mono", "JetBrains Mono", Consolas, monospace';
 
-export const inputCls = 'w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-2 py-1.5 text-xs text-[var(--ui-text)] font-mono focus:outline-none focus:border-[var(--ui-accent)]';
-export const btnGhost = 'px-3 py-1.5 text-xs border border-[var(--ui-rule)] rounded-[3px] hover:bg-[var(--ui-hover)] disabled:opacity-40 disabled:cursor-not-allowed';
-export const btnPrimary = 'px-3 py-1.5 text-xs rounded-[3px] font-medium bg-[var(--ui-accent)] text-[var(--ui-accentInk)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed';
-export const btnDanger = 'px-3 py-1.5 text-xs border border-[var(--ui-danger)] text-[var(--ui-danger)] rounded-[3px] hover:bg-[color-mix(in_srgb,var(--ui-danger)_10%,transparent)] disabled:opacity-40 disabled:cursor-not-allowed';
-export const boxCls = 'border border-[var(--ui-rule)] rounded-[3px] p-3 bg-[var(--ui-raised)]';
+export const inputCls = 'w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[var(--ui-r)] px-2.5 py-1.5 text-xs text-[var(--ui-text)] tabular-nums transition-shadow focus:outline-none focus:border-[var(--ui-accent)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--ui-accent)_22%,transparent)]';
+export const btnGhost = 'px-3 py-1.5 text-xs border border-[var(--ui-rule)] rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+export const btnPrimary = 'px-3 py-1.5 text-xs rounded-[var(--ui-r)] font-medium bg-[var(--ui-accent)] text-[var(--ui-accentInk)] hover:brightness-110 transition disabled:opacity-40 disabled:cursor-not-allowed';
+export const btnDanger = 'px-3 py-1.5 text-xs border border-[var(--ui-danger)] text-[var(--ui-danger)] rounded-[var(--ui-r)] hover:bg-[color-mix(in_srgb,var(--ui-danger)_10%,transparent)] disabled:opacity-40 disabled:cursor-not-allowed';
+export const boxCls = 'border border-[var(--ui-rule)] rounded-[var(--ui-r)] p-3 bg-[var(--ui-raised)] shadow-[var(--ui-shadow)]';
 
 const ICONS: Record<string, string> = {
   drawings: 'M4 20L20 4M5 6h6v6H5zM13 14h6v6h-6z',
@@ -88,17 +88,17 @@ export const Field: React.FC<{ label: string; hint?: string; children: React.Rea
 );
 
 export const Segmented: React.FC<{ value: string; options: { id: string; label: string }[]; onChange: (id: string) => void }> = ({ value, options, onChange }) => (
-  <div className="flex gap-1 p-0.5 border rounded-[3px]" style={{ borderColor: UI.rule, background: UI.bg }}>
+  <div className="flex gap-1 p-0.5 border rounded-[var(--ui-r)]" style={{ borderColor: UI.rule, background: UI.bg }}>
     {options.map(o => (
       <button key={o.id} onClick={() => onChange(o.id)}
-        className={`flex-1 py-1.5 text-xs rounded-[3px] ${value === o.id ? 'bg-[var(--ui-accent)] text-[var(--ui-accentInk)] font-medium' : 'hover:bg-[var(--ui-hover)]'}`}>{o.label}</button>
+        className={`flex-1 py-1.5 text-xs rounded-[var(--ui-r)] ${value === o.id ? 'bg-[var(--ui-accent)] text-[var(--ui-accentInk)] font-medium' : 'hover:bg-[var(--ui-hover)]'}`}>{o.label}</button>
     ))}
   </div>
 );
 
 export const Tag: React.FC<{ tone?: 'ok' | 'warn' | 'dim'; children: React.ReactNode }> = ({ tone = 'dim', children }) => {
   const c = tone === 'ok' ? UI.ok : tone === 'warn' ? UI.warn : UI.dim;
-  return <span className="px-1.5 py-0.5 text-[10px] border rounded-[3px] uppercase tracking-wide" style={{ color: c, borderColor: c + '66', fontFamily: MONO }}>{children}</span>;
+  return <span className="px-1.5 py-0.5 text-[10px] border rounded-[var(--ui-r)] uppercase tracking-wide" style={{ color: c, borderColor: c + '66', fontFamily: MONO }}>{children}</span>;
 };
 
 /** Bottom status bar (same strip the studios use). */
@@ -114,7 +114,7 @@ export const Rail: React.FC<{ items: { id: string; icon: string; label: string }
     {items.map(it => (
       <button key={it.id} title={it.label} onClick={() => onChange(it.id)}
         style={{ background: value === it.id ? UI.accent : 'transparent', color: value === it.id ? UI.accentInk : UI.text }}
-        className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1">
+        className="w-9 h-9 grid place-items-center rounded-[var(--ui-r)] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1">
         <Icon n={it.icon} />
       </button>
     ))}
@@ -137,7 +137,7 @@ export const Empty: React.FC<{ icon: string; title: string; hint: string }> = ({
 );
 
 export const Stat: React.FC<{ label: string; value: string; unit?: string; tone?: 'ok' | 'warn' | 'danger' }> = ({ label, value, unit, tone }) => (
-  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] px-3 py-2">
+  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] px-3 py-2">
     <div className="text-[11px]" style={{ color: UI.dim }}>{label}</div>
     <div className="mt-0.5 text-xl" style={{ fontFamily: MONO, color: tone === 'ok' ? UI.ok : tone === 'warn' ? UI.warn : tone === 'danger' ? UI.danger : 'var(--ui-strong)' }}>
       {value}{unit && <span className="text-xs" style={{ color: UI.dim }}> {unit}</span>}

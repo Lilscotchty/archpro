@@ -143,11 +143,11 @@ export const PlanViewport: React.FC<Props> = ({
       </div>
       {children}
       <div className="absolute right-3 bottom-3 flex flex-col gap-1 z-10">
-        <button className="w-8 h-8 rounded-[3px] border border-[var(--ui-rule)] bg-[var(--ui-panel)] text-[var(--ui-text)] hover:bg-[var(--ui-rule)]" onClick={() => zoomBy(1.25)} title="Zoom in">+</button>
-        <button className="w-8 h-8 rounded-[3px] border border-[var(--ui-rule)] bg-[var(--ui-panel)] text-[var(--ui-text)] hover:bg-[var(--ui-rule)]" onClick={() => zoomBy(0.8)} title="Zoom out">−</button>
-        <button className="w-8 h-8 rounded-[3px] border border-[var(--ui-rule)] bg-[var(--ui-panel)] text-[var(--ui-text)] hover:bg-[var(--ui-rule)] text-[10px]" onClick={fit} title="Fit to window">FIT</button>
+        <button className="w-8 h-8 rounded-[var(--ui-r)] border border-[var(--ui-rule)] bg-[var(--ui-panel)] text-[var(--ui-text)] hover:bg-[var(--ui-rule)]" onClick={() => zoomBy(1.25)} title="Zoom in">+</button>
+        <button className="w-8 h-8 rounded-[var(--ui-r)] border border-[var(--ui-rule)] bg-[var(--ui-panel)] text-[var(--ui-text)] hover:bg-[var(--ui-rule)]" onClick={() => zoomBy(0.8)} title="Zoom out">−</button>
+        <button className="w-8 h-8 rounded-[var(--ui-r)] border border-[var(--ui-rule)] bg-[var(--ui-panel)] text-[var(--ui-text)] hover:bg-[var(--ui-rule)] text-[10px]" onClick={fit} title="Fit to window">FIT</button>
       </div>
-      <div className="absolute left-3 bottom-3 z-10 text-[10px] text-[var(--ui-dim)] bg-[color-mix(in_srgb,var(--ui-panel)_90%,transparent)] border border-[var(--ui-rule)] px-2 py-1 rounded-[3px] pointer-events-none" style={{ fontFamily: 'ui-monospace, "IBM Plex Mono", Consolas, monospace' }}>
+      <div className="absolute left-3 bottom-3 z-10 text-[10px] text-[var(--ui-dim)] bg-[color-mix(in_srgb,var(--ui-panel)_90%,transparent)] border border-[var(--ui-rule)] px-2 py-1 rounded-[var(--ui-r)] pointer-events-none" style={{ fontFamily: 'ui-monospace, "IBM Plex Mono", Consolas, monospace' }}>
         Scroll = zoom · drag / Space+drag = pan
       </div>
     </div>

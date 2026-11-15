@@ -62,7 +62,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <Stat label="About" value={weeks.toFixed(1)} unit="weeks" />
                     <Stat label="Critical activities" value={`${critical} / ${acts.length}`} tone="warn" />
                   </div>
-                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] p-3 overflow-x-auto">
+                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] p-3 overflow-x-auto">
                     <div style={{ minWidth: 560 }}>
                       <div className="flex text-[10px] mb-1" style={{ color: UI.dim, fontFamily: MONO, paddingLeft: 200 }}>
                         <div className="relative flex-1 h-4">
@@ -74,10 +74,10 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                       {sched.items.map(i => (
                         <div key={i.id} className="flex items-center h-7 text-xs">
                           <div className="w-[200px] pr-2 truncate" title={i.name}><span style={{ color: UI.dim, fontFamily: MONO }}>{i.id}</span> {i.name}</div>
-                          <div className="relative flex-1 h-4" style={{ background: UI.raised, borderRadius: 3 }}>
+                          <div className="relative flex-1 h-4" style={{ background: UI.raised, borderRadius: 'var(--ui-r)' }}>
                             <div title={`Day ${i.es} → ${i.ef}`} style={{
                               position: 'absolute', top: 0, bottom: 0, left: `${(i.es / Math.max(sched.total, 1)) * 100}%`,
-                              width: `${(Math.max(i.days, 0.4) / Math.max(sched.total, 1)) * 100}%`, borderRadius: 3,
+                              width: `${(Math.max(i.days, 0.4) / Math.max(sched.total, 1)) * 100}%`, borderRadius: 'var(--ui-r)',
                               background: i.critical ? UI.warn : UI.accent,
                             }} />
                           </div>
@@ -85,11 +85,11 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                       ))}
                     </div>
                     <div className="mt-2 flex gap-4 text-[11px]" style={{ color: UI.dim }}>
-                      <span><span style={{ background: UI.warn }} className="inline-block w-2.5 h-2.5 rounded-[2px] mr-1.5 align-middle" />Critical path</span>
-                      <span><span style={{ background: UI.accent }} className="inline-block w-2.5 h-2.5 rounded-[2px] mr-1.5 align-middle" />Has float</span>
+                      <span><span style={{ background: UI.warn }} className="inline-block w-2.5 h-2.5 rounded-[var(--ui-r)] mr-1.5 align-middle" />Critical path</span>
+                      <span><span style={{ background: UI.accent }} className="inline-block w-2.5 h-2.5 rounded-[var(--ui-r)] mr-1.5 align-middle" />Has float</span>
                     </div>
                   </div>
-                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
                     <table className="w-full text-xs">
                       <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
                         <th className={`${thCls} w-10`}>#</th><th className={thCls}>Activity</th><th className={`${thCls} text-right`}>Days</th><th className={`${thCls} text-right`}>Start</th><th className={`${thCls} text-right`}>Finish</th><th className={`${thCls} text-right`}>Float</th>
@@ -111,7 +111,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <Panel>
               <Section title="Activities">
                 {acts.map(a => (
-                  <div key={a.id} style={{ borderColor: UI.rule, background: UI.raised }} className="border rounded-[3px] p-2 space-y-1.5">
+                  <div key={a.id} style={{ borderColor: UI.rule, background: UI.raised }} className="border rounded-[var(--ui-r)] p-2 space-y-1.5">
                     <div className="flex gap-1 items-center">
                       <span className="w-5 text-center text-[11px]" style={{ color: UI.dim, fontFamily: MONO }}>{a.id}</span>
                       <input className={inputCls} value={a.name} onChange={e => patchAct(a.id, { name: e.target.value })} />
@@ -144,7 +144,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <Stat label="High / critical" value={String(highRisks)} tone={highRisks ? 'danger' : 'ok'} />
                     <Stat label="Highest score" value={String(Math.max(...risks.map(riskScore)))} unit="/ 25" />
                   </div>
-                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
                     <table className="w-full text-xs">
                       <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
                         <th className={thCls}>Hazard</th><th className={`${thCls} w-14 text-right`}>L</th><th className={`${thCls} w-14 text-right`}>S</th><th className={`${thCls} w-24`}>Rating</th><th className={thCls}>Control measures</th><th className="w-8" />
@@ -158,7 +158,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                               {(['likelihood', 'severity'] as const).map(k => (
                                 <td key={k} className="px-1 py-1.5"><select className={inputCls} value={r[k]} onChange={e => patchRisk(r.id, { [k]: Number(e.target.value) })}>{[1, 2, 3, 4, 5].map(n => <option key={n}>{n}</option>)}</select></td>
                               ))}
-                              <td className={tdCls}><span className="px-1.5 py-0.5 border rounded-[3px]" style={{ color: BAND_COLOR[band], borderColor: BAND_COLOR[band] + '66', fontFamily: MONO }}>{sc} · {band}</span></td>
+                              <td className={tdCls}><span className="px-1.5 py-0.5 border rounded-[var(--ui-r)]" style={{ color: BAND_COLOR[band], borderColor: BAND_COLOR[band] + '66', fontFamily: MONO }}>{sc} · {band}</span></td>
                               <td className="px-2 py-1.5"><input className={inputCls} value={r.control} onChange={e => patchRisk(r.id, { control: e.target.value })} /></td>
                               <td className="px-1 py-1.5"><button title="Remove hazard" onClick={() => setRisks(rs => rs.filter(x => x.id !== r.id))} style={{ color: UI.dim }} className="p-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button></td>
                             </tr>

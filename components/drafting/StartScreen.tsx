@@ -17,7 +17,7 @@ export const StartScreen: React.FC<Props> = ({ busy, error, resume, onBlank, onD
   const drawRef = useRef<HTMLInputElement>(null);
   const planRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
-  const card = 'border rounded-[3px] p-5 text-left transition-colors';
+  const card = 'border rounded-[var(--ui-r)] p-5 text-left transition-colors';
 
   const handle = (f?: File | null) => { if (!f) return; if (/\.json$/i.test(f.name)) onPlanFile(f); else onDrawing(f); };
 
@@ -46,18 +46,18 @@ export const StartScreen: React.FC<Props> = ({ busy, error, resume, onBlank, onD
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button onClick={() => planRef.current?.click()} style={{ borderColor: UI.rule }} className="px-3 py-1.5 text-xs border rounded-[3px] hover:bg-[var(--ui-hover)]">
+          <button onClick={() => planRef.current?.click()} style={{ borderColor: UI.rule }} className="px-3 py-1.5 text-xs border rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)]">
             <span className="inline-flex items-center gap-2"><DIcon n="open" s={14} />Open plan file</span>
           </button>
           <input ref={planRef} type="file" accept=".json,application/json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onPlanFile(f); e.target.value = ''; }} />
           {resume && (
-            <button onClick={onResume} style={{ borderColor: UI.accent, color: UI.accent }} className="px-3 py-1.5 text-xs border rounded-[3px] hover:bg-[color-mix(in_srgb,var(--ui-accent)_10%,transparent)]">
+            <button onClick={onResume} style={{ borderColor: UI.accent, color: UI.accent }} className="px-3 py-1.5 text-xs border rounded-[var(--ui-r)] hover:bg-[color-mix(in_srgb,var(--ui-accent)_10%,transparent)]">
               Resume last session ({resume.walls} {resume.walls === 1 ? 'wall' : 'walls'}, {new Date(resume.savedAt).toLocaleString()})
             </button>
           )}
         </div>
 
-        {error && <div className="mt-4 text-xs p-3 border rounded-[3px]" style={{ borderColor: tint(UI.danger, 53), color: UI.danger }}>{error}</div>}
+        {error && <div className="mt-4 text-xs p-3 border rounded-[var(--ui-r)]" style={{ borderColor: tint(UI.danger, 24), background: tint(UI.danger, 6), color: UI.danger }}>{error}</div>}
         <div className="mt-8 text-[11px]" style={{ color: UI.dim, fontFamily: MONO }}>Your work autosaves in this browser. Use Save to keep a plan file you can reopen on any machine.</div>
       </div>
     </main>

@@ -23,7 +23,7 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
   const light = t === 'light';
   return (
     <button onClick={() => set(light ? 'dark' : 'light')} title={light ? 'Switch to dark theme' : 'Switch to light theme'} aria-label="Toggle light or dark theme"
-      className={`px-2 py-1.5 text-xs border rounded-[3px] hover:bg-[var(--ui-hover)] ${className}`} style={{ borderColor: 'var(--ui-rule)', color: 'var(--ui-text)' }}>
+      className={`px-2 py-1.5 text-xs border rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)] ${className}`} style={{ borderColor: 'var(--ui-rule)', color: 'var(--ui-text)' }}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         {light ? <path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z" /> : <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>}
       </svg>

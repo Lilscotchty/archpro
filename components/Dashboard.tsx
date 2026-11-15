@@ -60,70 +60,53 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
       <div className="absolute top-4 right-4 z-20"><ThemeToggle /></div>
       {/* Styles scoped to the dashboard only, so other pages keep the unified studio look */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
-        .legacy-dash { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
-        :root[data-theme="light"] .legacy-dash { --dash-heading: #0f172a; background-color: #eef2f7; color: #1e293b; }
-        :root[data-theme="light"] .legacy-dash .glass-panel { background: #ffffff; border-color: #d3d9e0; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
-        :root[data-theme="light"] .legacy-dash .glass-panel:hover { background: #f8fafc; }
-        :root[data-theme="light"] .legacy-dash h1 { background-image: linear-gradient(to bottom, #0f172a, #475569); }
-        :root[data-theme="light"] .legacy-dash .text-blue-400 { color: #1d4ed8; }
-        :root[data-theme="light"] .legacy-dash .text-slate-300, :root[data-theme="light"] .legacy-dash .text-slate-400 { color: #475569; }
-        :root[data-theme="light"] .legacy-dash .group:hover .group-hover\\:text-slate-200 { color: #0f172a; }
-        :root[data-theme="light"] .legacy-dash .group:hover .group-hover\\:text-blue-200 { color: #1d4ed8; }
-        .legacy-dash .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+        .legacy-dash { background-color: var(--ui-bg); color: var(--ui-text); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+        .legacy-dash .glass-panel { background: var(--ui-panel); border: 1px solid var(--ui-rule); box-shadow: var(--ui-shadow); }
+        .legacy-dash .glass-panel:hover { background: var(--ui-hover); }
       `}</style>
       
       {/* HEADER SECTION */}
-      <div className="text-center mb-16 relative">
-        <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full -z-10 animate-pulse"></div>
-        <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 mb-4 tracking-tight drop-shadow-lg">
-          Construct<span className="text-blue-400">OS</span>
+      <div className="text-center mb-10">
+        <h1 className="text-4xl font-semibold mb-2 tracking-tight" style={{ color: 'var(--ui-strong)' }}>
+          Construct<span style={{ color: 'var(--ui-accent)' }}>OS</span>
         </h1>
-        <p className="text-lg text-slate-300 max-w-xl mx-auto font-light tracking-wide text-shine">
+        <p className="text-base max-w-xl mx-auto" style={{ color: 'var(--ui-dim)' }}>
           The Spatial Engineering Platform.
         </p>
       </div>
 
       {/* CARDS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl w-full">
         {modules.map((mod, idx) => (
           <button
             key={mod.id}
             onClick={() => onSelectModule(mod.id)}
-            /* UPDATED CLASS NAMES:
-              - Removed generic hover styles from glass-panel
-              - Added specific 'hover:scale-[1.01]' and 'hover:bg-[var(--ui-hover2)]' here
-              - Removed rainbow borders
-            */
-            className="glass-panel group rounded-3xl p-8 text-left relative overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:bg-[var(--ui-hover2)] hover:shadow-2xl"
-            style={{ animationDelay: `${idx * 150}ms` }}
+            className="glass-panel group rounded-xl p-6 text-left relative flex items-start transition-colors duration-150"
           >
-            {/* INNER GLOW (Cleaned up) */}
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${mod.gradient} opacity-20 blur-2xl group-hover:opacity-30 transition-opacity duration-500 rounded-full -mr-10 -mt-10`}></div>
             
-            <div className="flex items-start gap-6 relative z-10">
-              <div className={`p-4 rounded-2xl bg-gradient-to-br ${mod.gradient} text-white shadow-lg group-hover:scale-105 transition-transform duration-500`}>
+            <div className="flex items-start gap-5 relative z-10">
+              <div className="p-3 rounded-[var(--ui-r)] shrink-0" style={{ background: 'color-mix(in srgb, var(--ui-accent) 12%, transparent)', color: 'var(--ui-accent)' }}>
                 {mod.icon}
               </div>
               <div>
-                <h3 className="text-2xl font-bold mb-2 group-hover:text-blue-200 transition-colors" style={{ color: 'var(--dash-heading, #fff)' }}>
+                <h3 className="text-lg font-semibold mb-1" style={{ color: 'var(--ui-strong)' }}>
                   {mod.title}
                 </h3>
-                <p className="text-slate-400 text-sm leading-relaxed font-medium group-hover:text-slate-200 transition-colors">
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--ui-dim)' }}>
                   {mod.desc}
                 </p>
               </div>
             </div>
 
             {/* ACTION ARROW */}
-            <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-               <svg className="w-6 h-6 text-[var(--ui-strong)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+            <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+               <svg className="w-5 h-5" style={{ color: 'var(--ui-accent)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </div>
           </button>
         ))}
       </div>
       
-      <div className="mt-20 text-slate-500/50 text-xs font-mono tracking-widest uppercase">
+      <div className="mt-16 text-xs" style={{ color: 'var(--ui-dim)' }}>
         v2.6.0 Stable / SMM7 Engine
       </div>
     </div>

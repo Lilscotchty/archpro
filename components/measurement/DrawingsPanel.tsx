@@ -62,7 +62,7 @@ export const DrawingsPanel: React.FC<Props> = ({ auto, setAuto, running, skipped
 
   return (
     <div className="max-w-6xl mx-auto grid gap-3">
-      <div className="border rounded-[3px] p-3 text-xs flex items-start gap-3 flex-wrap" style={{ borderColor: st.backend === 'cloud' ? tint(UI.ok, 53) : tint(UI.warn, 53), background: UI.raised }}>
+      <div className="border rounded-[var(--ui-r)] p-3 text-xs flex items-start gap-3 flex-wrap" style={{ borderColor: st.backend === 'cloud' ? tint(UI.ok, 53) : tint(UI.warn, 53), background: UI.raised }}>
         <div className="flex-1 min-w-[260px]">
           <div className="font-semibold" style={{ color: 'var(--ui-strong)' }}>
             {st.backend === 'cloud' ? 'Stored in Supabase' : cloudConfigured ? 'Supabase configured, but unavailable right now' : 'Stored in this browser only'}
@@ -85,14 +85,14 @@ export const DrawingsPanel: React.FC<Props> = ({ auto, setAuto, running, skipped
         <span className="text-[11px]" style={{ color: UI.dim }}>{list.length} stored</span>
       </div>
       {!hasPlan && <div className="text-xs" style={{ color: UI.dim }}>Draw walls in the Drafting Studio and the floor plan, foundation plan and elevations are produced for you here. You can still upload your own drawings.</div>}
-      {skipped.map((s, i) => <div key={i} className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>{s}</div>)}
-      {error && <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.danger, 53), color: UI.danger }}>{error}</div>}
+      {skipped.map((s, i) => <div key={i} className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>{s}</div>)}
+      {error && <div className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.danger, 24), background: tint(UI.danger, 6), color: UI.danger }}>{error}</div>}
       {msg && <div className="text-xs" style={{ color: UI.accent }}>{msg}</div>}
 
       {list.length === 0 ? <Empty icon="drawings" title="No drawings stored yet" hint="Drawings made in the Drafting Studio, the Elevation Studio or generated here for the take-off appear with their designated ids." /> : (
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
           {list.map(m => (
-            <div key={m.id} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden flex flex-col">
+            <div key={m.id} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden flex flex-col">
               <button onClick={() => open(m)} title="View"><Thumb m={m} /></button>
               <div className="p-3 text-xs space-y-1 flex-1">
                 <div style={{ fontFamily: MONO, color: UI.warn }} className="break-all">{m.ref}</div>
@@ -115,7 +115,7 @@ export const DrawingsPanel: React.FC<Props> = ({ auto, setAuto, running, skipped
 
       {view && (
         <div className="fixed inset-0 z-50 grid place-items-center p-6" style={{ background: 'rgba(10,11,13,.85)' }} onClick={close}>
-          <div className="max-w-[92vw] max-h-[92vh] flex flex-col border rounded-[3px]" style={{ background: UI.panel, borderColor: UI.rule }} onClick={e => e.stopPropagation()}>
+          <div className="max-w-[92vw] max-h-[92vh] flex flex-col border rounded-[var(--ui-r)]" style={{ background: UI.panel, borderColor: UI.rule }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-3 py-2 border-b text-xs" style={{ borderColor: UI.rule }}>
               <span style={{ fontFamily: MONO, color: UI.warn }}>{view.m.ref}</span><span>{view.m.title}</span><span className="flex-1" />
               <button className={btnGhost} onClick={() => dl(view.m, 'file')}>Download</button><button className={btnGhost} onClick={close}>Close</button>

@@ -51,7 +51,7 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   <Stat label="Total resistance R" value={f2(th.rTotal)} unit="m²K/W" />
                   <Stat label={`Heat loss (${area} m², ΔT ${dT} K)`} value={Math.round(th.heatLossW).toLocaleString()} unit="W" />
                 </div>
-                <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+                <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
                   <table className="w-full text-xs">
                     <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
                       <th className={thCls}>Layer</th><th className={`${thCls} w-24 text-right`}>Thickness</th><th className={`${thCls} w-24 text-right`}>λ W/mK</th><th className={`${thCls} w-24 text-right`}>R m²K/W</th>
@@ -82,7 +82,7 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <Stat label="Max bending moment" value={f2(lr.momentKnM)} unit="kNm" />
                 <Stat label="Max shear / reaction" value={f2(lr.shearKn)} unit="kN" />
               </div>
-              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
                 <table className="w-full text-xs"><tbody>
                   {[
                     ['Self-weight', `${f2(lr.selfWeightKpa)} kN/m²`],
@@ -105,7 +105,7 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <Stat label="Embodied carbon (A1–A3, indicative)" value={Math.round(total).toLocaleString()} unit="kgCO₂e" />
                 <Stat label="In tonnes" value={f2(total / 1000)} unit="tCO₂e" />
               </div>
-              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
                 <table className="w-full text-xs">
                   <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
                     <th className={thCls}>Material</th><th className={`${thCls} w-28 text-right`}>Quantity</th><th className={`${thCls} w-24 text-right`}>Factor</th><th className={`${thCls} w-28 text-right`}>kgCO₂e</th><th className="w-8" />

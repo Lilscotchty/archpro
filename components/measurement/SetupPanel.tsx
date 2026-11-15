@@ -21,7 +21,7 @@ export const SetupPanel: React.FC<{ s: BoqState }> = ({ s }) => {
   return (
     <div className="max-w-5xl mx-auto grid gap-3">
       {g.warnings.length > 0 && (
-        <div className="border rounded-[3px] p-3 text-xs space-y-1" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>
+        <div className="border rounded-[var(--ui-r)] p-3 text-xs space-y-1" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>
           {g.warnings.map((w, i) => <div key={i}>{w}</div>)}
         </div>
       )}
