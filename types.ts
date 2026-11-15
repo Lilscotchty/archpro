@@ -1,5 +1,7 @@
 // types.ts (Update)
 
+import type { Cad3dState } from './utils/cad/types';
+
 export enum AppModule {
   DASHBOARD = 'DASHBOARD',
   DRAWINGS = 'DRAWINGS',
@@ -95,4 +97,6 @@ export interface ProjectState {
   settings: ProjectSettings;
   // Legacy support for calculation
   calculatedTrenchLength?: number;
+  // 3D model page: overrides, objects modelled in 3D, layer state (see utils/cad/types.ts)
+  cad3d?: Cad3dState;
 }

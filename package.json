@@ -12,14 +12,19 @@
   "dependencies": {
     "@google/genai": "^1.32.0",
     "@supabase/supabase-js": "^2.39.0",
+    "earcut": "^3.2.4",
     "pdfjs-dist": "^6.5.438",
     "playcanvas": "^2.24.1",
+    "polygon-clipping": "^0.15.7",
     "qrcode.react": "^4.0.1",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react-dom": "^19.2.1",
+    "three": "^0.187.0"
   },
   "devDependencies": {
+    "@types/earcut": "^3.0.0",
     "@types/node": "^22.14.0",
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^5.0.0",
     "jsdom": "^31.0.1",
     "tsx": "^4.23.15",
