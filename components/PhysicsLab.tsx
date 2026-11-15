@@ -116,8 +116,8 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         <td className="px-2 py-1"><input className={inputCls} value={r.name} onChange={e => patchRow(i, { name: e.target.value })} /></td>
                         <td className="px-2 py-1"><div className="flex items-center gap-1"><input type="number" className={`${inputCls} text-right`} value={r.qty} onChange={e => patchRow(i, { qty: num(e.target.value) })} /><span style={{ color: UI.dim }}>{r.unit}</span></div></td>
                         <td className="px-2 py-1"><input type="number" className={`${inputCls} text-right`} value={r.factor} onChange={e => patchRow(i, { factor: num(e.target.value) })} /></td>
-                        <td className={`${tdCls} text-right`} style={{ fontFamily: MONO, color: '#e6e9ed' }}>{Math.round(Math.max(0, r.qty) * r.factor).toLocaleString()}</td>
-                        <td className="px-1"><button onClick={() => setRows(rs => rs.filter((_, k) => k !== i))} title="Remove" style={{ color: UI.dim }} className="p-1 hover:text-white"><Icon n="trash" s={14} /></button></td>
+                        <td className={`${tdCls} text-right`} style={{ fontFamily: MONO, color: 'var(--ui-strong)' }}>{Math.round(Math.max(0, r.qty) * r.factor).toLocaleString()}</td>
+                        <td className="px-1"><button onClick={() => setRows(rs => rs.filter((_, k) => k !== i))} title="Remove" style={{ color: UI.dim }} className="p-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -150,7 +150,7 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   <div key={i} className={`${boxCls} space-y-1.5`}>
                     <div className="flex gap-1">
                       <input className={inputCls} value={l.name} onChange={e => patchLayer(i, { name: e.target.value })} />
-                      <button onClick={() => setLayers(ls => ls.filter((_, k) => k !== i))} title="Remove layer" style={{ color: UI.dim }} className="px-1 hover:text-white"><Icon n="trash" s={14} /></button>
+                      <button onClick={() => setLayers(ls => ls.filter((_, k) => k !== i))} title="Remove layer" style={{ color: UI.dim }} className="px-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
                       <label className="text-[10px]" style={{ color: UI.dim }}>Thickness (mm)<input type="number" className={`${inputCls} mt-0.5`} value={l.thicknessMm} onChange={e => patchLayer(i, { thicknessMm: num(e.target.value) })} /></label>

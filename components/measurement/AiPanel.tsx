@@ -2,7 +2,7 @@
 import React, { useRef, useState } from 'react';
 import { BoqState } from './useBoqState';
 import { Card, Check, Lbl, Select, TextInput } from './fields';
-import { Empty, Tag, UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
+import { Empty, Tag, UI, MONO, btnGhost, btnPrimary, inputCls, tint } from '../ui';
 import { AiExtraction, DEFAULT_MODEL, Provider, resolveModel, analyseGemini, analyseText, applyExtraction, listGeminiModels, listGroqModels, mergeExtractions, testProvider } from '../../utils/boq/ai';
 import { readPageText } from '../../utils/boq/textRead';
 import { rasterizeForAi } from '../../utils/boq/rasterize';
@@ -154,12 +154,12 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; onEstimate?
           <span className="text-xs" style={{ color: UI.dim }}>{progress}</span>
         </div>
       </Card>
-      {error && <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.danger + '88', color: UI.danger }}>{error}</div>}
+      {error && <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.danger, 53), color: UI.danger }}>{error}</div>}
       {thumbs.length > 0 && <div className="flex gap-2 overflow-x-auto">{thumbs.map((t, i) => <img key={i} src={t} alt={`page ${from + i}`} className="h-28 border rounded-[3px]" style={{ borderColor: UI.rule, background: '#fff' }} />)}</div>}
 
       {result ? (
         <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] p-3 text-xs space-y-3">
-          <div className="flex items-center gap-2"><span className="font-semibold" style={{ color: '#e6e9ed' }}>What the AI read</span><Tag tone="warn">review</Tag><Tag>{result.drawingType}</Tag>{result.scale && <Tag>{result.scale}</Tag>}</div>
+          <div className="flex items-center gap-2"><span className="font-semibold" style={{ color: 'var(--ui-strong)' }}>What the AI read</span><Tag tone="warn">review</Tag><Tag>{result.drawingType}</Tag>{result.scale && <Tag>{result.scale}</Tag>}</div>
           {result.warnings.length > 0 && <ul className="space-y-1" style={{ color: UI.warn }}>{result.warnings.map((w, i) => <li key={i}>• {w}</li>)}</ul>}
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { BoqState } from './useBoqState';
 import { NumInput, fmt } from './fields';
-import { UI, MONO, inputCls } from '../ui';
+import { UI, MONO, inputCls, tint } from '../ui';
 import { scopeNotes } from '../../utils/boq/takeoff';
 import { placeholderStats, rateWarning } from '../../utils/boq/pricing';
 
@@ -12,8 +12,8 @@ export const SummaryView: React.FC<{ s: BoqState }> = ({ s }) => {
   const max = Math.max(1, ...m.sections.map(x => x.total));
   const row = (label: React.ReactNode, amt: number, strong = false) => (
     <tr style={{ borderColor: UI.rule }} className="border-t">
-      <td className="px-3 py-2" style={{ fontWeight: strong ? 600 : 400, color: strong ? '#e6e9ed' : UI.text }}>{label}</td>
-      <td className="px-3 py-2 text-right" style={{ fontFamily: MONO, fontWeight: strong ? 700 : 400, color: '#e6e9ed' }}>{fmt(amt)}</td>
+      <td className="px-3 py-2" style={{ fontWeight: strong ? 600 : 400, color: strong ? 'var(--ui-strong)' : UI.text }}>{label}</td>
+      <td className="px-3 py-2 text-right" style={{ fontFamily: MONO, fontWeight: strong ? 700 : 400, color: 'var(--ui-strong)' }}>{fmt(amt)}</td>
     </tr>
   );
   const pct = (label: string, k: keyof typeof mk) => (
@@ -21,12 +21,12 @@ export const SummaryView: React.FC<{ s: BoqState }> = ({ s }) => {
   );
   return (
     <div className="max-w-4xl mx-auto grid gap-4">
-      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.danger + '88', color: UI.danger }}>{w}</div> : null; })()}
+      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.danger, 53), color: UI.danger }}>{w}</div> : null; })()}
       <div className="grid grid-cols-3 gap-3">
         {[['Net measured works', m.net], ['Tender total', m.grand], [`Per m2 of floor area`, m.perM2]].map(([l, v]) => (
           <div key={l as string} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] px-3 py-2">
             <div className="text-[11px]" style={{ color: UI.dim }}>{l}</div>
-            <div className="text-xl mt-0.5" style={{ fontFamily: MONO, color: '#e6e9ed' }}>{fmt(v as number, 0)}<span className="text-xs" style={{ color: UI.dim }}> {cur}</span></div>
+            <div className="text-xl mt-0.5" style={{ fontFamily: MONO, color: 'var(--ui-strong)' }}>{fmt(v as number, 0)}<span className="text-xs" style={{ color: UI.dim }}> {cur}</span></div>
           </div>
         ))}
       </div>
@@ -57,7 +57,7 @@ export const SummaryView: React.FC<{ s: BoqState }> = ({ s }) => {
       </div>
       <div className="text-[11px]" style={{ color: UI.dim }}>Preliminaries apply to net works; overheads and profit to works plus preliminaries; contingency to the running total; taxes to the sub-total. Set the tax and levy percentage that applies to your project.</div>
       <div style={{ borderColor: UI.rule, background: UI.raised }} className="border rounded-[3px] p-3">
-        <div className="text-xs font-semibold mb-1" style={{ color: '#e6e9ed' }}>Basis of the take-off</div>
+        <div className="text-xs font-semibold mb-1" style={{ color: 'var(--ui-strong)' }}>Basis of the take-off</div>
         <ol className="list-decimal pl-4 text-[11px] space-y-1" style={{ color: UI.dim }}>{scopeNotes(s.assumptions).map((n, i) => <li key={i}>{n}</li>)}</ol>
       </div>
     </div>

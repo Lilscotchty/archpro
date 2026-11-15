@@ -1,3 +1,4 @@
+import { ThemeToggle } from './theme';
 import React from 'react';
 import { AppModule } from '../types';
 
@@ -56,10 +57,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
 
   return (
     <div className="legacy-dash flex flex-col items-center justify-center min-h-screen p-8 relative z-10">
+      <div className="absolute top-4 right-4 z-20"><ThemeToggle /></div>
       {/* Styles scoped to the dashboard only, so other pages keep the unified studio look */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
         .legacy-dash { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+        :root[data-theme="light"] .legacy-dash { --dash-heading: #0f172a; background-color: #eef2f7; color: #1e293b; }
+        :root[data-theme="light"] .legacy-dash .glass-panel { background: #ffffff; border-color: #d3d9e0; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+        :root[data-theme="light"] .legacy-dash .glass-panel:hover { background: #f8fafc; }
+        :root[data-theme="light"] .legacy-dash h1 { background-image: linear-gradient(to bottom, #0f172a, #475569); }
+        :root[data-theme="light"] .legacy-dash .text-blue-400 { color: #1d4ed8; }
+        :root[data-theme="light"] .legacy-dash .text-slate-300, :root[data-theme="light"] .legacy-dash .text-slate-400 { color: #475569; }
+        :root[data-theme="light"] .legacy-dash .group:hover .group-hover\\:text-slate-200 { color: #0f172a; }
+        :root[data-theme="light"] .legacy-dash .group:hover .group-hover\\:text-blue-200 { color: #1d4ed8; }
         .legacy-dash .glass-panel { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
       `}</style>
       
@@ -82,10 +92,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
             onClick={() => onSelectModule(mod.id)}
             /* UPDATED CLASS NAMES:
               - Removed generic hover styles from glass-panel
-              - Added specific 'hover:scale-[1.01]' and 'hover:bg-white/10' here
+              - Added specific 'hover:scale-[1.01]' and 'hover:bg-[var(--ui-hover2)]' here
               - Removed rainbow borders
             */
-            className="glass-panel group rounded-3xl p-8 text-left relative overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:bg-white/10 hover:shadow-2xl"
+            className="glass-panel group rounded-3xl p-8 text-left relative overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:bg-[var(--ui-hover2)] hover:shadow-2xl"
             style={{ animationDelay: `${idx * 150}ms` }}
           >
             {/* INNER GLOW (Cleaned up) */}
@@ -96,7 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
                 {mod.icon}
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-blue-200 transition-colors">
+                <h3 className="text-2xl font-bold mb-2 group-hover:text-blue-200 transition-colors" style={{ color: 'var(--dash-heading, #fff)' }}>
                   {mod.title}
                 </h3>
                 <p className="text-slate-400 text-sm leading-relaxed font-medium group-hover:text-slate-200 transition-colors">
@@ -107,7 +117,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
 
             {/* ACTION ARROW */}
             <div className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+               <svg className="w-6 h-6 text-[var(--ui-strong)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </div>
           </button>
         ))}

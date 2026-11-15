@@ -12,10 +12,10 @@ import { AppModule, ProjectState } from './types';
 
 const GlobalStyles = () => (
   <style>{`
-    .app-bg { background-color: #15171a; min-height: 100vh; color: #c9cfd6; }
+    .app-bg { background-color: var(--ui-bg); min-height: 100vh; color: var(--ui-text); }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #15171a; }
-    ::-webkit-scrollbar-thumb { background: #2e333a; border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: var(--ui-bg); }
+    ::-webkit-scrollbar-thumb { background: var(--ui-scroll); border-radius: 4px; }
   `}</style>
 );
 

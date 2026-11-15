@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ArchPro</title>
+    <style>
+      :root { color-scheme: dark;
+        --ui-bg:#15171a; --ui-panel:#1f2227; --ui-raised:#181a1e; --ui-sunken:#0f1113; --ui-rule:#2e333a; --ui-text:#c9cfd6; --ui-dim:#7d8590; --ui-strong:#e6e9ed;
+        --ui-accent:#4aa3ff; --ui-accentInk:#06121f; --ui-danger:#e5484d; --ui-dangerText:#ff9ea1; --ui-warn:#f5b83d; --ui-warnTint:#3a2f12; --ui-ok:#3ddb8a;
+        --ui-hover:rgba(255,255,255,.05); --ui-hover2:rgba(255,255,255,.10); --ui-scroll:#2e333a; --ui-scrollHover:#3b424b; }
+      :root[data-theme="light"] { color-scheme: light;
+        --ui-bg:#f3f5f8; --ui-panel:#ffffff; --ui-raised:#eceff3; --ui-sunken:#dfe4ea; --ui-rule:#d3d9e0; --ui-text:#2b323b; --ui-dim:#5b6673; --ui-strong:#0f1720;
+        --ui-accent:#0b6fe0; --ui-accentInk:#ffffff; --ui-danger:#c9272d; --ui-dangerText:#b42318; --ui-warn:#a85a00; --ui-warnTint:#fdf0d2; --ui-ok:#15803d;
+        --ui-hover:rgba(15,23,32,.06); --ui-hover2:rgba(15,23,32,.10); --ui-scroll:#c3cad3; --ui-scrollHover:#a9b2bd; }
+    </style>
+    <script>try{if(localStorage.getItem('archpro.theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
@@ -19,11 +30,11 @@
       }
     </script>
     <style>
-      body { background-color: #15171a; color: #c9cfd6; font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+      body { background-color: var(--ui-bg); color: var(--ui-text); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
       ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: #15171a; }
-      ::-webkit-scrollbar-thumb { background: #2e333a; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #3b424b; }
+      ::-webkit-scrollbar-track { background: var(--ui-bg); }
+      ::-webkit-scrollbar-thumb { background: var(--ui-scroll); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--ui-scrollHover); }
     </style>
   </head>
   <body>

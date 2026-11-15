@@ -2,7 +2,7 @@
 import React, { useRef, useState } from 'react';
 import { BoqState } from './useBoqState';
 import { NumInput } from './fields';
-import { UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
+import { UI, MONO, btnGhost, btnPrimary, inputCls, tint } from '../ui';
 import { DEFAULT_RATES, importRatesCsv, ratesToCsv, today } from '../../utils/boq/rates';
 import { download } from '../../utils/boq/export';
 import { RateItem } from '../../utils/boq/types';
@@ -26,7 +26,7 @@ export const RatesView: React.FC<{ s: BoqState }> = ({ s }) => {
   const keys = Object.keys(s.rates).filter(k => (k + s.rates[k].label).toLowerCase().includes(q.toLowerCase())).sort();
   return (
     <div className="max-w-4xl mx-auto grid gap-3">
-      <div className="border rounded-[3px] p-3 text-xs" style={{ borderColor: UI.warn + '88', color: UI.warn }}>
+      <div className="border rounded-[3px] p-3 text-xs" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>
         Rates with no date are placeholders so the bill is not blank. They are not a price list. {placeholders} of {Object.keys(s.rates).length} rates are still placeholders. Type your own, or import a CSV of your supplier and subcontractor prices (Export first to get the layout: key, item, unit, rate, source, updated). Rates you enter are dated and marked as yours.
       </div>
       <div className="flex gap-2 items-center flex-wrap">

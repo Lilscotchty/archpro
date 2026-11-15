@@ -22,7 +22,7 @@ export const NumField: React.FC<{
         onChange={e => setTxt(e.target.value)} onBlur={() => { setFocus(false); commit(); }}
         onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } if (e.key === 'Escape') { setTxt(show(value)); e.currentTarget.blur(); } e.stopPropagation(); }}
         style={{ background: UI.bg, borderColor: UI.rule, color: UI.text, fontFamily: MONO, paddingRight: suffix ? 30 : undefined }}
-        className="w-full px-2 py-1.5 border rounded-[3px] text-xs text-right focus:outline-none focus:border-[#4aa3ff] disabled:opacity-40" />
+        className="w-full px-2 py-1.5 border rounded-[3px] text-xs text-right focus:outline-none focus:border-[var(--ui-accent)] disabled:opacity-40" />
       {suffix && <span className="absolute right-2 text-[10px] pointer-events-none" style={{ color: UI.dim }}>{suffix}</span>}
     </span>
   );

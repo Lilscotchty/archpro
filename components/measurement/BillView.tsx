@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { BoqState } from './useBoqState';
 import { NumInput, TextInput, Select, fmt } from './fields';
-import { Empty, Icon, Tag, UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
+import { Empty, Icon, Tag, UI, MONO, btnGhost, btnPrimary, inputCls, tint } from '../ui';
 import { PricedLine, placeholderStats, rateWarning } from '../../utils/boq/pricing';
 import { SECTIONS } from '../../utils/boq/types';
 import { refOf } from '../../utils/boq/export';
@@ -25,13 +25,13 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
 
   return (
     <div className="max-w-6xl mx-auto grid gap-4">
-      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.danger + '88', color: UI.danger }}>{w}</div> : null; })()}
-      {(s.model.walls.some(w => w.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) && <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.warn + '88', color: UI.warn }}>Quantities include values the AI read from the drawing. Check the Schedule tab against the drawing, then confirm the Setup assumptions (foundation depth, roof, finishes) that the drawing does not show.</div>}
-      {s.built.geo.warnings.map((w, i) => <div key={i} className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.warn + '88', color: UI.warn }}>{w}</div>)}
+      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.danger, 53), color: UI.danger }}>{w}</div> : null; })()}
+      {(s.model.walls.some(w => w.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) && <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>Quantities include values the AI read from the drawing. Check the Schedule tab against the drawing, then confirm the Setup assumptions (foundation depth, roof, finishes) that the drawing does not show.</div>}
+      {s.built.geo.warnings.map((w, i) => <div key={i} className="text-xs border rounded-[3px] p-2" style={{ borderColor: tint(UI.warn, 53), color: UI.warn }}>{w}</div>)}
       {total.map(sec => (
         <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: UI.rule, background: UI.raised }}>
-            <div className="text-xs font-semibold" style={{ color: '#e6e9ed' }}><span style={{ fontFamily: MONO, color: UI.warn }}>{sec.code}</span> &nbsp; {sec.title}</div>
+            <div className="text-xs font-semibold" style={{ color: 'var(--ui-strong)' }}><span style={{ fontFamily: MONO, color: UI.warn }}>{sec.code}</span> &nbsp; {sec.title}</div>
             <div className="text-xs" style={{ fontFamily: MONO }}>{cur} {fmt(sec.total)}</div>
           </div>
           <table className="w-full text-xs">
@@ -58,7 +58,7 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
                       {l.custom ? <span style={{ fontFamily: MONO }}>{fmt(l.rate)}</span>
                         : <NumInput className={inputCls + ' text-right'} value={l.rate} onChange={n => setOv(l.key, { rate: n }, l)} />}
                     </td>
-                    <td className="px-3 py-2 text-right" style={{ fontFamily: MONO, color: '#e6e9ed' }}>{fmt(l.amount)}</td>
+                    <td className="px-3 py-2 text-right" style={{ fontFamily: MONO, color: 'var(--ui-strong)' }}>{fmt(l.amount)}</td>
                     <td className="px-1 py-1 text-right whitespace-nowrap">
                       {l.custom
                         ? <button title="Delete item" className="p-1" style={{ color: UI.dim }} onClick={() => s.setCustoms(c => c.filter(x => x.id !== l.key))}><Icon n="trash" s={14} /></button>
@@ -81,7 +81,7 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
       ))}
 
       <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] p-3">
-        <div className="text-xs font-semibold mb-2" style={{ color: '#e6e9ed' }}>Add your own item</div>
+        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--ui-strong)' }}>Add your own item</div>
         <div className="grid grid-cols-12 gap-2 items-end">
           <div className="col-span-3"><Select value={nl.section} onChange={v => setNl({ ...nl, section: v })} options={SECTIONS.map(x => [x.code, `${x.code} ${x.title}`] as [string, string])} /></div>
           <div className="col-span-4"><TextInput value={nl.description} placeholder="Description" onChange={v => setNl({ ...nl, description: v })} /></div>

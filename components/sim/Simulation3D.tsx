@@ -8,7 +8,7 @@ import { buildGLB } from '../../utils/sim/gltf';
 import { DEFAULT_COLORS, DEFAULT_SIM, MatKey, PlanEl, SimPart, SimSettings } from '../../utils/sim/types';
 import { ArchElement, ProjectState } from '../../types';
 
-const C = { bg: '#15171a', panel: '#1f2227', rule: '#2e333a', text: '#c9cfd6', dim: '#7d8590', accent: '#4aa3ff', raised: '#181a1e', warn: '#f5b83d', danger: '#e5484d' };
+const C = { bg: 'var(--ui-bg)', panel: 'var(--ui-panel)', rule: 'var(--ui-rule)', text: 'var(--ui-text)', dim: 'var(--ui-dim)', accent: 'var(--ui-accent)', raised: 'var(--ui-raised)', warn: 'var(--ui-warn)', danger: 'var(--ui-danger)' };
 const MONO = 'ui-monospace, "IBM Plex Mono", Consolas, monospace';
 
 const ICON: Record<string, string> = {
@@ -26,7 +26,7 @@ const Ico = ({ n, s = 18 }: { n: string; s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICON[n]} /></svg>
 );
 const RailBtn: React.FC<{ on?: boolean; title: string; onClick: () => void; children: React.ReactNode }> = ({ on, title, onClick, children }) => (
-  <button title={title} onClick={onClick} style={{ background: on ? C.accent : 'transparent', color: on ? '#06121f' : C.text }}
+  <button title={title} onClick={onClick} style={{ background: on ? C.accent : 'transparent', color: on ? 'var(--ui-accentInk)' : C.text }}
     className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1">{children}</button>
 );
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -48,7 +48,7 @@ const Slider: React.FC<{ label: string; value: number; min: number; max: number;
     <input type="range" min={min} max={max} value={value} onChange={e => onChange(Number(e.target.value))} className="w-full" />
   </label>
 );
-const btn = 'px-3 py-1.5 text-xs border rounded-[3px] hover:bg-white/5';
+const btn = 'px-3 py-1.5 text-xs border rounded-[3px] hover:bg-[var(--ui-hover)]';
 
 const MAT_LABEL: Record<MatKey, string> = { wall: 'Walls', slab: 'Floor slabs', roof: 'Roof', door: 'Doors', frame: 'Frames', glass: 'Glass', plinth: 'Plinth', column: 'Columns', ground: 'Ground' };
 const KIND_LABEL: Record<string, string> = { wall: 'Walls', door: 'Doors', window: 'Windows', slab: 'Slabs', roof: 'Roof', column: 'Columns' };
@@ -179,9 +179,9 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
             {groups.length === 0 && <div style={{ color: C.dim }} className="px-1">Nothing to show yet. Draw walls or a rectangle in the 2D plan.</div>}
             {groups.map(([kind, list]) => (
               <details key={kind} open={kind === 'door' || kind === 'window'}>
-                <summary className="cursor-pointer px-1 py-0.5 hover:bg-white/5" style={{ color: C.text }}>{KIND_LABEL[kind] ?? kind} <span style={{ color: C.dim }}>({list.length})</span></summary>
+                <summary className="cursor-pointer px-1 py-0.5 hover:bg-[var(--ui-hover)]" style={{ color: C.text }}>{KIND_LABEL[kind] ?? kind} <span style={{ color: C.dim }}>({list.length})</span></summary>
                 {list.map(p => (
-                  <button key={p.id} onClick={() => pick(p)} className="block w-full text-left pl-5 pr-1 py-0.5 truncate hover:bg-white/5"
+                  <button key={p.id} onClick={() => pick(p)} className="block w-full text-left pl-5 pr-1 py-0.5 truncate hover:bg-[var(--ui-hover)]"
                     style={{ color: p.id === partId ? C.accent : C.dim, fontFamily: MONO }}>{p.name}</button>
                 ))}
               </details>

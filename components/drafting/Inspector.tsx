@@ -3,7 +3,7 @@ import React from 'react';
 import { ArchElement, ProjectState } from '../../types';
 import { angleDeg, fmtMm, polar, segLen } from '../../utils/drafting/geometry';
 import { isOpening, isWall, planStats, setWallLength, stretchEnd } from '../../utils/drafting/ops';
-import { Section, UI, MONO, btnDanger, btnGhost, inputCls } from '../ui';
+import { Section, UI, MONO, btnDanger, btnGhost, inputCls, tint } from '../ui';
 import { NumField, Row } from './fields';
 import { DIcon } from './icons';
 
@@ -24,7 +24,7 @@ export const Inspector: React.FC<{ project: ProjectState; sel: Set<string>; comm
           <div className="flex justify-between"><span style={{ color: UI.dim }}>Total wall length</span><span>{(s.totalMm / 1000).toFixed(2)} m</span></div>
         </div>
         {s.walls > 0 && s.dangling > 0 && (
-          <div className="flex gap-2 text-xs p-2 border rounded-[3px]" style={{ borderColor: UI.warn + '66', color: UI.warn }}>
+          <div className="flex gap-2 text-xs p-2 border rounded-[3px]" style={{ borderColor: tint(UI.warn, 40), color: UI.warn }}>
             <DIcon n="warn" s={14} /><span>{s.dangling} wall {s.dangling === 1 ? 'end is' : 'ends are'} not joined to another wall. Foundation and room detection need closed loops.</span>
           </div>
         )}

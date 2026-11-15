@@ -225,9 +225,9 @@ export const SimView: React.FC<SimViewProps> = props => {
   useEffect(() => { if (ready) frame(); }, [props.frameKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={wrapRef} className="absolute inset-0 overflow-hidden" style={{ background: '#131519' }}>
+    <div ref={wrapRef} className="absolute inset-0 overflow-hidden" style={{ background: 'var(--ui-sunken)' }}>
       <canvas ref={canvasRef} style={{ display: 'block', touchAction: 'none', outline: 'none' }} />
-      {error && <div className="absolute inset-0 grid place-items-center text-sm" style={{ color: '#c9cfd6' }}>{error}</div>}
+      {error && <div className="absolute inset-0 grid place-items-center text-sm" style={{ color: 'var(--ui-text)' }}>{error}</div>}
     </div>
   );
 };

@@ -115,7 +115,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <div className="flex gap-1 items-center">
                       <span className="w-5 text-center text-[11px]" style={{ color: UI.dim, fontFamily: MONO }}>{a.id}</span>
                       <input className={inputCls} value={a.name} onChange={e => patchAct(a.id, { name: e.target.value })} />
-                      <button title="Remove activity" onClick={() => removeAct(a.id)} style={{ color: UI.dim }} className="px-1 hover:text-white"><Icon n="trash" s={14} /></button>
+                      <button title="Remove activity" onClick={() => removeAct(a.id)} style={{ color: UI.dim }} className="px-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
                       <label className="text-[10px]" style={{ color: UI.dim }}>Days<input type="number" min={0} className={`${inputCls} mt-0.5`} value={a.days} onChange={e => patchAct(a.id, { days: Math.max(0, num(e.target.value)) })} /></label>
@@ -160,7 +160,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                               ))}
                               <td className={tdCls}><span className="px-1.5 py-0.5 border rounded-[3px]" style={{ color: BAND_COLOR[band], borderColor: BAND_COLOR[band] + '66', fontFamily: MONO }}>{sc} · {band}</span></td>
                               <td className="px-2 py-1.5"><input className={inputCls} value={r.control} onChange={e => patchRisk(r.id, { control: e.target.value })} /></td>
-                              <td className="px-1 py-1.5"><button title="Remove hazard" onClick={() => setRisks(rs => rs.filter(x => x.id !== r.id))} style={{ color: UI.dim }} className="p-1 hover:text-white"><Icon n="trash" s={14} /></button></td>
+                              <td className="px-1 py-1.5"><button title="Remove hazard" onClick={() => setRisks(rs => rs.filter(x => x.id !== r.id))} style={{ color: UI.dim }} className="p-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button></td>
                             </tr>
                           );
                         })}

@@ -15,7 +15,7 @@ interface Props {
   onChange: (fn: (p: ProjectState) => ProjectState) => void;
 }
 
-const sel = 'bg-[#15171a] border border-[#2e333a] rounded-[3px] px-1.5 py-1 text-xs font-mono text-[#c9cfd6]';
+const sel = 'bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-1.5 py-1 text-xs font-mono text-[var(--ui-text)]';
 
 const LiveView: React.FC<Props> = ({ project, selectedId, onSelect, onChange }) => {
   const live = useDeferredValue(project);               // keeps 2D drawing responsive while the 3D model catches up
@@ -51,7 +51,7 @@ const LiveView: React.FC<Props> = ({ project, selectedId, onSelect, onChange }) 
           </label>
         )}
         <label className="flex items-center gap-1 cursor-pointer" style={{ color: UI.dim }}><input type="checkbox" checked={showRoof} onChange={e => setShowRoof(e.target.checked)} />Roof</label>
-        <button className="px-2 py-1 border rounded-[3px] hover:bg-white/5" style={{ borderColor: UI.rule }} onClick={() => setFrameKey(k => k + 1)} title="Re-centre the camera on the model">Fit</button>
+        <button className="px-2 py-1 border rounded-[3px] hover:bg-[var(--ui-hover)]" style={{ borderColor: UI.rule }} onClick={() => setFrameKey(k => k + 1)} title="Re-centre the camera on the model">Fit</button>
       </div>
       {empty && <div className="absolute inset-0 grid place-items-center pointer-events-none text-xs" style={{ color: UI.dim, fontFamily: MONO }}>Draw walls in the plan and the model appears here.</div>}
       {warn.length > 0 && <div style={{ background: 'rgba(31,34,39,.92)', borderColor: UI.warn, color: UI.warn }} className="absolute left-2 bottom-2 right-2 px-2.5 py-1.5 border rounded-[3px] text-[11px] space-y-0.5">{warn.map((w, i) => <div key={i}>{w}</div>)}</div>}

@@ -7,12 +7,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 // Same button language as the studios: flat, 3px corners, single blue accent.
 export const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', className = '', icon, ...props }) => {
-  const baseStyle = 'inline-flex items-center justify-center px-3 py-1.5 text-xs rounded-[3px] focus-visible:outline outline-2 outline-offset-2 outline-[#4aa3ff] disabled:opacity-40 disabled:cursor-not-allowed';
+  const baseStyle = 'inline-flex items-center justify-center px-3 py-1.5 text-xs rounded-[3px] focus-visible:outline outline-2 outline-offset-2 outline-[var(--ui-accent)] disabled:opacity-40 disabled:cursor-not-allowed';
   const variants = {
-    primary: 'bg-[#4aa3ff] text-[#06121f] font-medium hover:brightness-110',
-    secondary: 'border border-[#2e333a] text-[#c9cfd6] hover:bg-white/5',
-    danger: 'border border-[#e5484d] text-[#e5484d] hover:bg-[#e5484d]/10',
-    ghost: 'text-[#7d8590] hover:text-[#c9cfd6] hover:bg-white/5',
+    primary: 'bg-[var(--ui-accent)] text-[var(--ui-accentInk)] font-medium hover:brightness-110',
+    secondary: 'border border-[var(--ui-rule)] text-[var(--ui-text)] hover:bg-[var(--ui-hover)]',
+    danger: 'border border-[var(--ui-danger)] text-[var(--ui-danger)] hover:bg-[color-mix(in_srgb,var(--ui-danger)_10%,transparent)]',
+    ghost: 'text-[var(--ui-dim)] hover:text-[var(--ui-text)] hover:bg-[var(--ui-hover)]',
   };
   return (
     <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>

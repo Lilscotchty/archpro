@@ -75,7 +75,7 @@ export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
           <Section title="Key figures">
             <div className="text-xs space-y-1.5" style={{ fontFamily: MONO }}>
               <div className="flex justify-between"><span style={{ color: UI.dim }}>Net works</span><span>{fmt(s.summary.net, 0)}</span></div>
-              <div className="flex justify-between"><span style={{ color: UI.dim }}>Tender total</span><span style={{ color: '#e6e9ed' }}>{fmt(s.summary.grand, 0)}</span></div>
+              <div className="flex justify-between"><span style={{ color: UI.dim }}>Tender total</span><span style={{ color: 'var(--ui-strong)' }}>{fmt(s.summary.grand, 0)}</span></div>
               <div className="flex justify-between"><span style={{ color: UI.dim }}>Per m2 GFA</span><span>{fmt(s.summary.perM2, 0)}</span></div>
               <div className="flex justify-between"><span style={{ color: UI.dim }}>Currency</span><span>{s.assumptions.currency}</span></div>
             </div>

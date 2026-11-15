@@ -81,7 +81,7 @@ export const ScalePanel: React.FC<Props> = ({ project, tool, setTool, calPts, ca
                 <div className="flex gap-2">
                   <input className={inputCls} inputMode="decimal" autoFocus placeholder="Real length" value={real} onChange={e => setReal(e.target.value)}
                     onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' && realMm > 0) applyTwoPoint(realMm); }} />
-                  <select className="w-16 bg-[#15171a] border border-[#2e333a] rounded-[3px] px-1.5 text-xs font-mono text-[#c9cfd6]" value={unitSel} onChange={e => setUnitSel(e.target.value as 'mm' | 'm')}><option>m</option><option>mm</option></select>
+                  <select className="w-16 bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-1.5 text-xs font-mono text-[var(--ui-text)]" value={unitSel} onChange={e => setUnitSel(e.target.value as 'mm' | 'm')}><option>m</option><option>mm</option></select>
                 </div>
                 <div className="flex gap-2">
                   <button className={btnPrimary + ' flex-1'} disabled={!(realMm > 0)} onClick={() => { applyTwoPoint(realMm); setReal(''); }}>Set scale</button>
@@ -95,7 +95,7 @@ export const ScalePanel: React.FC<Props> = ({ project, tool, setTool, calPts, ca
             <p className="text-xs" style={{ color: UI.dim }}>Use this when the drawing was exported or printed at an exact scale. Vector PDFs know their page size, so this is exact. Check the result with the Measure tool.</p>
             <Field label="Drawing scale 1 :">
               <div className="flex gap-2">
-                <select className="flex-1 bg-[#15171a] border border-[#2e333a] rounded-[3px] px-1.5 py-1.5 text-xs font-mono text-[#c9cfd6]" value={STANDARD_SCALES.includes(denom) ? denom : 0} onChange={e => Number(e.target.value) && setDenom(Number(e.target.value))}>
+                <select className="flex-1 bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-1.5 py-1.5 text-xs font-mono text-[var(--ui-text)]" value={STANDARD_SCALES.includes(denom) ? denom : 0} onChange={e => Number(e.target.value) && setDenom(Number(e.target.value))}>
                   {STANDARD_SCALES.map(s => <option key={s} value={s}>1 : {s}</option>)}{!STANDARD_SCALES.includes(denom) && <option value={0}>Custom</option>}
                 </select>
                 <NumField value={denom} onCommit={n => n > 0 && setDenom(n)} min={1} width="w-20" />
@@ -103,7 +103,7 @@ export const ScalePanel: React.FC<Props> = ({ project, tool, setTool, calPts, ca
             </Field>
             {u.kind === 'image' && (
               <Field label="Image printed on">
-                <select className="w-full bg-[#15171a] border border-[#2e333a] rounded-[3px] px-1.5 py-1.5 text-xs font-mono text-[#c9cfd6]" value={dpi > 0 ? 'dpi' : paper} onChange={e => { if (e.target.value === 'dpi') setDpi(150); else { setDpi(0); setPaper(e.target.value); } }}>
+                <select className="w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-1.5 py-1.5 text-xs font-mono text-[var(--ui-text)]" value={dpi > 0 ? 'dpi' : paper} onChange={e => { if (e.target.value === 'dpi') setDpi(150); else { setDpi(0); setPaper(e.target.value); } }}>
                   {Object.keys(PAPER_SIZES).map(p => <option key={p} value={p}>{p} sheet</option>)}<option value="dpi">Known resolution (dpi)</option>
                 </select>
               </Field>
@@ -131,7 +131,7 @@ export const ScalePanel: React.FC<Props> = ({ project, tool, setTool, calPts, ca
         <Check checked={u.visible} onChange={v => patchUnderlay({ visible: v })}>Show drawing</Check>
         {u.numPages && u.numPages > 1 && (
           <Field label="PDF page">
-            <select className="w-full bg-[#15171a] border border-[#2e333a] rounded-[3px] px-1.5 py-1.5 text-xs font-mono text-[#c9cfd6]" value={u.page ?? 1} onChange={e => onPage(Number(e.target.value))} disabled={busy}>
+            <select className="w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-1.5 py-1.5 text-xs font-mono text-[var(--ui-text)]" value={u.page ?? 1} onChange={e => onPage(Number(e.target.value))} disabled={busy}>
               {Array.from({ length: u.numPages }, (_, i) => <option key={i} value={i + 1}>Page {i + 1} of {u.numPages}</option>)}
             </select>
           </Field>

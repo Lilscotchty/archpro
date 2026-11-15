@@ -4,20 +4,24 @@
 // a single blue accent, a 44px title bar. No gradients, glass or glow.
 
 import React from 'react';
+import { ThemeToggle } from './theme';
 
+// Every colour is a CSS variable (see index.html), so one data-theme switch restyles the whole app.
 export const UI = {
-  bg: '#15171a', panel: '#1f2227', raised: '#181a1e', rule: '#2e333a',
-  text: '#c9cfd6', dim: '#7d8590', accent: '#4aa3ff', accentInk: '#06121f',
-  danger: '#e5484d', warn: '#f5b83d', ok: '#3ddb8a',
+  bg: 'var(--ui-bg)', panel: 'var(--ui-panel)', raised: 'var(--ui-raised)', rule: 'var(--ui-rule)',
+  text: 'var(--ui-text)', dim: 'var(--ui-dim)', strong: 'var(--ui-strong)', accent: 'var(--ui-accent)', accentInk: 'var(--ui-accentInk)',
+  danger: 'var(--ui-danger)', warn: 'var(--ui-warn)', ok: 'var(--ui-ok)', sunken: 'var(--ui-sunken)',
 };
+/** A theme colour at a given opacity (replaces the old `colour + '88'` hex-alpha trick). */
+export const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 export const FONT = '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
 export const MONO = 'ui-monospace, "IBM Plex Mono", "JetBrains Mono", Consolas, monospace';
 
-export const inputCls = 'w-full bg-[#15171a] border border-[#2e333a] rounded-[3px] px-2 py-1.5 text-xs text-[#c9cfd6] font-mono focus:outline-none focus:border-[#4aa3ff]';
-export const btnGhost = 'px-3 py-1.5 text-xs border border-[#2e333a] rounded-[3px] hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed';
-export const btnPrimary = 'px-3 py-1.5 text-xs rounded-[3px] font-medium bg-[#4aa3ff] text-[#06121f] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed';
-export const btnDanger = 'px-3 py-1.5 text-xs border border-[#e5484d] text-[#e5484d] rounded-[3px] hover:bg-[#e5484d]/10 disabled:opacity-40 disabled:cursor-not-allowed';
-export const boxCls = 'border border-[#2e333a] rounded-[3px] p-3 bg-[#181a1e]';
+export const inputCls = 'w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[3px] px-2 py-1.5 text-xs text-[var(--ui-text)] font-mono focus:outline-none focus:border-[var(--ui-accent)]';
+export const btnGhost = 'px-3 py-1.5 text-xs border border-[var(--ui-rule)] rounded-[3px] hover:bg-[var(--ui-hover)] disabled:opacity-40 disabled:cursor-not-allowed';
+export const btnPrimary = 'px-3 py-1.5 text-xs rounded-[3px] font-medium bg-[var(--ui-accent)] text-[var(--ui-accentInk)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed';
+export const btnDanger = 'px-3 py-1.5 text-xs border border-[var(--ui-danger)] text-[var(--ui-danger)] rounded-[3px] hover:bg-[color-mix(in_srgb,var(--ui-danger)_10%,transparent)] disabled:opacity-40 disabled:cursor-not-allowed';
+export const boxCls = 'border border-[var(--ui-rule)] rounded-[3px] p-3 bg-[var(--ui-raised)]';
 
 const ICONS: Record<string, string> = {
   drawings: 'M4 20L20 4M5 6h6v6H5zM13 14h6v6h-6z',
@@ -57,11 +61,12 @@ export const Screen: React.FC<{
   <div className="h-screen w-full flex flex-col" style={{ background: UI.bg, color: UI.text, fontFamily: FONT, fontSize: 13 }}>
     <header style={{ background: UI.panel, borderColor: UI.rule }} className="h-11 flex items-center gap-3 px-3 border-b shrink-0">
       {onHome
-        ? <button onClick={onHome} className="font-semibold tracking-tight hover:text-white" title="Back to dashboard">ArchPro</button>
+        ? <button onClick={onHome} className="font-semibold tracking-tight hover:text-[var(--ui-strong)]" title="Back to dashboard">ArchPro</button>
         : <span className="font-semibold tracking-tight">ArchPro</span>}
       {crumb && <span style={{ color: UI.dim }}>/ {crumb}</span>}
       <div className="flex-1" />
       {actions}
+      <ThemeToggle />
     </header>
     {children}
   </div>
@@ -86,7 +91,7 @@ export const Segmented: React.FC<{ value: string; options: { id: string; label: 
   <div className="flex gap-1 p-0.5 border rounded-[3px]" style={{ borderColor: UI.rule, background: UI.bg }}>
     {options.map(o => (
       <button key={o.id} onClick={() => onChange(o.id)}
-        className={`flex-1 py-1.5 text-xs rounded-[3px] ${value === o.id ? 'bg-[#4aa3ff] text-[#06121f] font-medium' : 'hover:bg-white/5'}`}>{o.label}</button>
+        className={`flex-1 py-1.5 text-xs rounded-[3px] ${value === o.id ? 'bg-[var(--ui-accent)] text-[var(--ui-accentInk)] font-medium' : 'hover:bg-[var(--ui-hover)]'}`}>{o.label}</button>
     ))}
   </div>
 );
@@ -125,7 +130,7 @@ export const Empty: React.FC<{ icon: string; title: string; hint: string }> = ({
   <div className="h-full grid place-items-center">
     <div className="text-center max-w-xs">
       <div style={{ color: UI.dim }} className="flex justify-center"><Icon n={icon} s={28} /></div>
-      <div className="mt-3 font-semibold" style={{ color: '#e6e9ed' }}>{title}</div>
+      <div className="mt-3 font-semibold" style={{ color: 'var(--ui-strong)' }}>{title}</div>
       <div className="mt-1 text-xs" style={{ color: UI.dim }}>{hint}</div>
     </div>
   </div>
@@ -134,7 +139,7 @@ export const Empty: React.FC<{ icon: string; title: string; hint: string }> = ({
 export const Stat: React.FC<{ label: string; value: string; unit?: string; tone?: 'ok' | 'warn' | 'danger' }> = ({ label, value, unit, tone }) => (
   <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] px-3 py-2">
     <div className="text-[11px]" style={{ color: UI.dim }}>{label}</div>
-    <div className="mt-0.5 text-xl" style={{ fontFamily: MONO, color: tone === 'ok' ? UI.ok : tone === 'warn' ? UI.warn : tone === 'danger' ? UI.danger : '#e6e9ed' }}>
+    <div className="mt-0.5 text-xl" style={{ fontFamily: MONO, color: tone === 'ok' ? UI.ok : tone === 'warn' ? UI.warn : tone === 'danger' ? UI.danger : 'var(--ui-strong)' }}>
       {value}{unit && <span className="text-xs" style={{ color: UI.dim }}> {unit}</span>}
     </div>
   </div>
