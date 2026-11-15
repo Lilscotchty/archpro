@@ -5,15 +5,19 @@
 
 import { Assumptions, BoqModel, OpeningRow, WallRow } from './types';
 
-export const GROQ_BASE = 'https://api.groq.com/openai/v1';
-// Groq retired Llama 4 Scout (17 Jul 2026) and Maverick (9 Mar 2026). Qwen 3.6 27B is Groq's recommended replacement and
-// accepts images (max 3 per request, 20 MB). Models are tried in this order if the chosen one cannot read images.
-export const DEFAULT_GROQ_MODEL = 'qwen/qwen3.6-27b';
-export const VISION_FALLBACKS = ['qwen/qwen3.6-27b'];
-const RETIRED_MODELS = /llama-4-scout|llama-4-maverick|llama-3\.2-.*vision/i;
-/** Map a stored or typed model id to one that can still read images. */
-export function resolveModel(m: string): string { return !m.trim() || RETIRED_MODELS.test(m) ? DEFAULT_GROQ_MODEL : m.trim(); }
-/** Ids from Groq's list that are not chat/vision models (speech, guard, embeddings). */
+// Two free routes. 'gemini' reads the page image directly (Google AI Studio free tier). 'groq-text' never sends an image:
+// the page text is extracted in the browser (PDF text layer, or free in-browser OCR for scans) and a text model structures it.
+export type Provider = 'gemini' | 'groq-text';
+export const DEFAULT_MODEL: Record<Provider, string> = { gemini: 'gemini-3.1-flash-lite', 'groq-text': 'openai/gpt-oss-120b' };
+const RETIRED_GROQ = /llama-4-scout|llama-4-maverick|llama-3\.2-.*vision|llama-3\.3-70b-versatile|llama-3\.1-8b-instant|qwen3-32b/i;
+export function resolveModel(provider: Provider, m: string): string {
+  const t = m.trim();
+  if (!t) return DEFAULT_MODEL[provider];
+  if (provider === 'groq-text' && (RETIRED_GROQ.test(t) || t.startsWith('gemini'))) return DEFAULT_MODEL[provider];
+  if (provider === 'gemini' && !t.startsWith('gemini')) return DEFAULT_MODEL[provider];
+  return t;
+}
+/** Ids from Groq's list that are not chat models (speech, guard, embeddings). */
 export const isChatModelId = (id: string) => !/whisper|tts|orpheus|guard|safeguard|embed|compound/i.test(id);
 
 export interface AiOpening { mark: string; widthMm: number; heightMm: number | null; count: number; external: boolean | null; description: string | null }
@@ -202,92 +206,116 @@ export function applyExtraction(ex: AiExtraction, model: BoqModel, a: Assumption
   return { model: { ...model, walls, footprint, openings: [...keep(model.openings), ...open] }, assumptions: next, summary };
 }
 
-// ---------------------------------------------------------------- Groq calls
-async function post(url: string, apiKey: string, body: unknown, signal?: AbortSignal) {
+// ---------------------------------------------------------------- provider calls
+export const GROQ_BASE = 'https://api.groq.com/openai/v1';
+export const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+async function send(name: string, url: string, init: RequestInit): Promise<any> {
   let res: Response;
-  try {
-    res = await fetch(url, { method: 'POST', signal, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: JSON.stringify(body) });
-  } catch (e) {
+  try { res = await fetch(url, init); }
+  catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    throw new Error('Could not reach api.groq.com. Check your internet connection, any ad-blocker or firewall, and that the key is correct.');
+    throw new Error(`Could not reach ${name}. Check your internet connection, any ad-blocker or firewall, and that the key is correct.`);
   }
   const text = await res.text();
   if (!res.ok) {
-    let msg = text; try { msg = JSON.parse(text)?.error?.message ?? text; } catch { /* keep raw */ }
-    const err = new Error(res.status === 401 ? 'Groq rejected the API key (401). Check the key and try again.'
-      : res.status === 429 ? 'Groq rate limit reached (429). Wait a minute and retry, or analyse fewer pages.'
-      : `Groq error ${res.status}: ${msg.slice(0, 300)}`);
+    let msg = text; try { const j = JSON.parse(text); msg = j?.error?.message ?? text; } catch { /* keep raw */ }
+    const err = new Error(res.status === 401 || res.status === 403 ? `${name} rejected the API key (${res.status}). Check the key and try again.`
+      : res.status === 429 ? `${name} free-tier rate limit reached (429). Wait a minute and retry, or read fewer pages.`
+      : `${name} error ${res.status}: ${msg.slice(0, 300)}`);
     (err as any).status = res.status; (err as any).detail = msg; throw err;
   }
   return JSON.parse(text);
 }
+const groqPost = (key: string, path: string, body: unknown, signal?: AbortSignal) =>
+  send('api.groq.com', `${GROQ_BASE}${path}`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify(body) });
 
 export async function listGroqModels(apiKey: string): Promise<string[]> {
-  const res = await fetch(`${GROQ_BASE}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
-  if (!res.ok) throw new Error(res.status === 401 ? 'Groq rejected the API key (401).' : `Could not list models (${res.status}).`);
-  const j = await res.json();
+  const j = await send('api.groq.com', `${GROQ_BASE}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
   return (j.data as { id: string }[]).map(m => m.id).filter(isChatModelId).sort();
 }
-
-const NOT_VISION = /must be a string|image|vision|multimodal|content.*(array|string)/i;
-const GONE = /decommission|deprecat|no longer supported|not found|does not exist|model_not_found/i;
-
-export async function analyseDrawing(opts: { apiKey: string; model: string; imageDataUrl: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string; modelUsed: string }> {
-  const first = resolveModel(opts.model);
-  const candidates = [first, ...VISION_FALLBACKS.filter(m => m !== first)];
-  let lastErr: unknown;
-  for (const model of candidates) {
-    const body: Record<string, unknown> = {
-      model, temperature: 0, max_completion_tokens: 8000,
-      messages: [
-        { role: 'system', content: SYSTEM },
-        { role: 'user', content: [{ type: 'text', text: buildPrompt(opts.hint) }, { type: 'image_url', image_url: { url: opts.imageDataUrl } }] },
-      ],
-      response_format: { type: 'json_object' },
-    };
-    try {
-      let json: any;
-      try { json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal); }
-      catch (e) {
-        // some models reject JSON mode together with images: retry once in plain mode
-        const d = String((e as any).detail);
-        if ((e as any).status === 400 && /response_format|json_object|json mode/i.test(d) && !/must be a string/i.test(d)) {
-          delete body.response_format; json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal);
-        } else throw e;
-      }
-      const raw: string = json?.choices?.[0]?.message?.content ?? '';
-      if (!raw.trim()) throw new Error(`${model} returned an empty reply (it may have used its whole token budget thinking). Try again or use a smaller page.`);
-      const ex = normalise(extractJson(raw));
-      ex.warnings.push(...crossCheck(ex));
-      return { extraction: ex, raw, modelUsed: model };
-    } catch (e) {
-      lastErr = e;
-      const status = (e as any).status, d = String((e as any).detail ?? (e as Error).message);
-      const modelProblem = (status === 400 && NOT_VISION.test(d)) || ((status === 400 || status === 404) && GONE.test(d));
-      if (!modelProblem || model === candidates[candidates.length - 1]) {
-        if (modelProblem) throw new Error(`"${model}" cannot read images on your Groq account (${d.slice(0, 160)}). Choose a vision model such as ${DEFAULT_GROQ_MODEL} in the Model box.`);
-        throw e;
-      }
-      // otherwise fall through to the next vision-capable candidate
-    }
-  }
-  throw lastErr;
+export async function listGeminiModels(apiKey: string): Promise<string[]> {
+  const j = await send('Google AI', `${GEMINI_BASE}/models?pageSize=200`, { headers: { 'x-goog-api-key': apiKey } });
+  return (j.models as { name: string; supportedGenerationMethods?: string[] }[])
+    .filter(m => m.supportedGenerationMethods?.includes('generateContent') && /gemini/.test(m.name) && !/image|tts|live|embed|veo|imagen|audio/i.test(m.name))
+    .map(m => m.name.replace(/^models\//, '')).sort();
 }
 
-/** Live check with the person's real key: draws a small image containing a number and asks the model to read it back. */
-export async function testVision(apiKey: string, model: string): Promise<{ ok: boolean; modelUsed: string; message: string }> {
-  const c = document.createElement('canvas'); c.width = 320; c.height = 120;
-  const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, 320, 120); g.fillStyle = '#000'; g.font = 'bold 72px sans-serif'; g.fillText('4817', 40, 88);
-  const url = c.toDataURL('image/jpeg', 0.9);
-  const candidates = [resolveModel(model), ...VISION_FALLBACKS].filter((m, i, a) => a.indexOf(m) === i);
-  let last = '';
-  for (const m of candidates) {
-    try {
-      const json = await post(`${GROQ_BASE}/chat/completions`, apiKey, { model: m, temperature: 0, max_completion_tokens: 2000,
-        messages: [{ role: 'user', content: [{ type: 'text', text: 'What number is written in this image? Reply with the digits only.' }, { type: 'image_url', image_url: { url } }] }] });
-      const out = String(json?.choices?.[0]?.message?.content ?? '').replace(/<think>[\s\S]*?<\/think>/gi, '');
-      return out.includes('4817') ? { ok: true, modelUsed: m, message: `${m} can read images with your key.` } : { ok: false, modelUsed: m, message: `${m} answered "${out.trim().slice(0, 60)}", not 4817. It is not reading images reliably.` };
-    } catch (e) { last = (e as Error).message; }
+// ---- text route (Groq, no images): message content is always a plain string
+export function buildTextPrompt(hint: string, pageText: string): string {
+  return `Below is the text extracted from ONE page of a construction drawing (PDF text layer or OCR). Positions are lost, so it is a list of labels, dimension strings, schedule rows and notes.\n` +
+    `Only use numbers that appear in this text. If the text does not contain a value, use null and add a warning. Do not invent door or window counts: count only marks or schedule rows that appear.\n` +
+    `${hint ? `Context from the user: ${hint}\n` : ''}` +
+    `Rules:\n- Dimensions may be in mm or m: output metres for *M fields and millimetres for *Mm fields.\n- If a door/window schedule is present, use its mark, size and quantity.\n- Include every room name that appears.\nReturn exactly this JSON shape:\n${SCHEMA}\n\n----- PAGE TEXT -----\n${pageText.slice(0, 24000)}`;
+}
+
+export async function analyseText(opts: { apiKey: string; model: string; pageText: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string; modelUsed: string }> {
+  const model = resolveModel('groq-text', opts.model);
+  const body: Record<string, unknown> = {
+    model, temperature: 0, max_completion_tokens: 8000,
+    messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: buildTextPrompt(opts.hint, opts.pageText) }],
+    response_format: { type: 'json_object' },
+  };
+  let json: any;
+  try { json = await groqPost(opts.apiKey, '/chat/completions', body, opts.signal); }
+  catch (e) {
+    if ((e as any).status === 400 && /response_format|json_object|json mode/i.test(String((e as any).detail))) { delete body.response_format; json = await groqPost(opts.apiKey, '/chat/completions', body, opts.signal); }
+    else if (/decommission|deprecat|no longer supported|not found|does not exist|model_not_found/i.test(String((e as any).detail ?? ''))) throw new Error(`Groq model "${model}" is not available on your account. Use "Check key and list models" and pick another text model.`);
+    else throw e;
   }
-  return { ok: false, modelUsed: candidates[0], message: last };
+  const raw: string = json?.choices?.[0]?.message?.content ?? '';
+  if (!raw.trim()) throw new Error(`${model} returned an empty reply. Try again.`);
+  const ex = normalise(extractJson(raw)); ex.warnings.push(...crossCheck(ex));
+  return { extraction: ex, raw, modelUsed: model };
+}
+
+// ---- vision route (Gemini free tier)
+export async function analyseGemini(opts: { apiKey: string; model: string; imageDataUrl: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string; modelUsed: string }> {
+  const m = /^data:([^;]+);base64,(.*)$/.exec(opts.imageDataUrl); if (!m) throw new Error('Internal error: the page image was not a data URL.');
+  const call = (model: string) => send('Google AI', `${GEMINI_BASE}/models/${model}:generateContent`, {
+    method: 'POST', signal: opts.signal, headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: 'user', parts: [{ text: buildPrompt(opts.hint) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: 'application/json' },
+    }),
+  });
+  let model = resolveModel('gemini', opts.model), json: any;
+  try { json = await call(model); }
+  catch (e) {
+    const st = (e as any).status;
+    if (st !== 404 && st !== 400) throw e;
+    // model name retired or renamed: pick the first current Flash model your key can use
+    const list = await listGeminiModels(opts.apiKey);
+    const alt = list.find(x => /flash-lite/.test(x) && !/preview|exp/.test(x)) ?? list.find(x => /flash/.test(x) && !/preview|exp/.test(x)) ?? list.find(x => /flash/.test(x));
+    if (!alt || alt === model) throw e;
+    model = alt; json = await call(model);
+  }
+  const raw: string = (json?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('');
+  if (!raw.trim()) throw new Error(`Gemini returned no text (${json?.candidates?.[0]?.finishReason ?? json?.promptFeedback?.blockReason ?? 'unknown reason'}).`);
+  const ex = normalise(extractJson(raw)); ex.warnings.push(...crossCheck(ex));
+  return { extraction: ex, raw, modelUsed: model };
+}
+
+/** Live check with the person's real key. */
+export async function testProvider(provider: Provider, apiKey: string, model: string): Promise<{ ok: boolean; modelUsed: string; message: string }> {
+  try {
+    if (provider === 'groq-text') {
+      const m = resolveModel(provider, model);
+      const j = await groqPost(apiKey, '/chat/completions', { model: m, temperature: 0, max_completion_tokens: 500, messages: [{ role: 'user', content: 'Reply with only the number 4817.' }] });
+      const out = String(j?.choices?.[0]?.message?.content ?? '');
+      return out.includes('4817') ? { ok: true, modelUsed: m, message: `${m} works with your Groq key (text route).` } : { ok: false, modelUsed: m, message: `${m} replied "${out.slice(0, 60)}".` };
+    }
+    const c = document.createElement('canvas'); c.width = 320; c.height = 120;
+    const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, 320, 120); g.fillStyle = '#000'; g.font = 'bold 72px sans-serif'; g.fillText('4817', 40, 88);
+    const body = (mm: string) => send('Google AI', `${GEMINI_BASE}/models/${mm}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'What number is written in this image? Digits only.' }, { inline_data: { mime_type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.9).split(',')[1] } }] }] }) });
+    let m = resolveModel('gemini', model), j: any;
+    try { j = await body(m); } catch (e) {
+      if ((e as any).status !== 404 && (e as any).status !== 400) throw e;
+      const list = await listGeminiModels(apiKey); const alt = list.find(x => /flash/.test(x) && !/preview|exp/.test(x)) ?? list.find(x => /flash/.test(x)); if (!alt) throw e; m = alt; j = await body(m);
+    }
+    const out = (j?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('');
+    return out.includes('4817') ? { ok: true, modelUsed: m, message: `${m} can read images with your Google key.` } : { ok: false, modelUsed: m, message: `${m} answered "${out.trim().slice(0, 60)}", not 4817.` };
+  } catch (e) { return { ok: false, modelUsed: model, message: (e as Error).message }; }
 }
