@@ -1,9 +1,11 @@
 // components/MethodStudy.tsx — construction programme (critical path) and site risk register.
 import React, { useMemo, useState } from 'react';
 import { Activity, Risk, RiskBand, SAMPLE_ACTIVITIES, SAMPLE_RISKS, riskBand, riskScore, schedule } from '../utils/methodEngine';
-import { Empty, Icon, Panel, Rail, Screen, Section, Stat, StatusBar, Tag, UI, MONO, btnGhost, btnPrimary, inputCls, tdCls, thCls } from './ui';
+import { Empty, Icon, Panel, Rail, Screen, Section, Segmented, Stat, StatusBar, Tag, UI, MONO, btnGhost, btnPrimary, inputCls, tdCls, thCls } from './ui';
+import { layoutCpm, renderCpmSvg } from '../utils/cpmDiagram';
+import { downloadPdf, downloadPng, downloadSvg } from '../utils/cpmExport';
 
-type Tab = 'programme' | 'risks';
+type Tab = 'programme' | 'network' | 'risks';
 const num = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
 const withIds = <T,>(xs: T[]) => xs.map((x, i) => ({ ...x, id: i + 1 }));
 const parsePreds = (s: string) => Array.from(new Set(s.split(/[\s,;]+/).map(x => parseInt(x, 10)).filter(n => Number.isFinite(n))));
@@ -23,7 +25,25 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [predText, setPredText] = useState<Record<number, string>>({});
   const [risks, setRisks] = useState<Risk[]>(() => withIds(SAMPLE_RISKS));
 
+  const [diag, setDiag] = useState({ titleKey: false, highlight: false, fit: true });
+  const [exporting, setExporting] = useState('');
+  const [exportErr, setExportErr] = useState('');
+
   const sched = useMemo(() => schedule(acts), [acts]);
+  const layout = useMemo(() => (sched.error ? null : layoutCpm(sched.items, sched.total)), [sched]);
+  const svgOpts = { title: diag.titleKey ? 'Critical Path Diagram' : undefined, key: diag.titleKey, highlight: diag.highlight };
+  const svg = useMemo(() => (layout ? renderCpmSvg(layout, svgOpts) : ''), [layout, diag.titleKey, diag.highlight]); // eslint-disable-line react-hooks/exhaustive-deps
+  const svgSize = useMemo(() => { const m = /width="(\d+(?:\.\d+)?)" height="(\d+(?:\.\d+)?)"/.exec(svg); return m ? { w: Number(m[1]), h: Number(m[2]) } : { w: 0, h: 0 }; }, [svg]);
+  const runExport = async (kind: 'png' | 'pdf' | 'svg') => {
+    if (!svg) return;
+    setExportErr(''); setExporting(kind);
+    try {
+      if (kind === 'svg') downloadSvg(svg, 'critical-path-diagram.svg');
+      else if (kind === 'png') await downloadPng(svg, svgSize.w, svgSize.h, 'critical-path-diagram.png');
+      else await downloadPdf(svg, svgSize.w, svgSize.h, 'critical-path-diagram.pdf');
+    } catch (e) { setExportErr((e as Error).message || 'Export failed.'); }
+    finally { setExporting(''); }
+  };
   const nextId = (xs: { id: number }[]) => (xs.length ? Math.max(...xs.map(x => x.id)) + 1 : 1);
   const patchAct = (id: number, p: Partial<Activity>) => setActs(a => a.map(x => (x.id === id ? { ...x, ...p } : x)));
   const removeAct = (id: number) => setActs(a => a.filter(x => x.id !== id).map(x => ({ ...x, preds: x.preds.filter(p => p !== id) })));
@@ -39,12 +59,45 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const exportRisks = () => download('risk_register.csv', csv([['ID', 'Hazard', 'Likelihood', 'Severity', 'Score', 'Rating', 'Control'],
     ...risks.map(r => [r.id, r.hazard, r.likelihood, r.severity, riskScore(r), riskBand(riskScore(r)), r.control])]));
 
+  const activitiesSection = (
+              <Section title="Activities">
+                {acts.map(a => (
+                  <div key={a.id} style={{ background: UI.raised }} className="rounded-[var(--ui-r)] p-2 space-y-1.5">
+                    <div className="flex gap-1 items-center">
+                      <span className="w-5 text-center text-[11px]" style={{ color: UI.dim, fontFamily: MONO }}>{a.id}</span>
+                      <input className={inputCls} value={a.name} onChange={e => patchAct(a.id, { name: e.target.value })} />
+                      <button title="Remove activity" onClick={() => removeAct(a.id)} style={{ color: UI.dim }} className="px-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <label className="text-[10px]" style={{ color: UI.dim }}>Days<input type="number" min={0} className={`${inputCls} mt-0.5`} value={a.days} onChange={e => patchAct(a.id, { days: Math.max(0, num(e.target.value)) })} /></label>
+                      <label className="text-[10px]" style={{ color: UI.dim }}>After (#, comma-separated)
+                        <input className={`${inputCls} mt-0.5`} value={predText[a.id] ?? a.preds.join(', ')}
+                          onChange={e => { setPredText(t => ({ ...t, [a.id]: e.target.value })); patchAct(a.id, { preds: parsePreds(e.target.value) }); }}
+                          onBlur={() => setPredText(t => { const n = { ...t }; delete n[a.id]; return n; })} />
+                      </label>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <button className={btnGhost} onClick={() => setActs(a => [...a, { id: nextId(a), name: 'New activity', days: 1, preds: a.length ? [a[a.length - 1].id] : [] }])}>Add activity</button>
+                  <button className={btnGhost} onClick={() => { setActs(withIds(SAMPLE_ACTIVITIES)); setPredText({}); }}>Load sample</button>
+                </div>
+              </Section>
+  );
+
   return (
-    <Screen crumb={`Method study / ${tab === 'programme' ? 'Programme' : 'Risk register'}`} onHome={onClose}
-      actions={<button className={btnPrimary} onClick={tab === 'programme' ? exportProgramme : exportRisks}>Export CSV</button>}>
+    <Screen crumb={`Method study / ${tab === 'programme' ? 'Programme' : tab === 'network' ? 'Critical path diagram' : 'Risk register'}`} onHome={onClose}
+      actions={tab === 'network' ? (
+        <>
+          <button className={btnGhost} disabled={!svg || !!exporting} onClick={() => runExport('svg')}>SVG</button>
+          <button className={btnGhost} disabled={!svg || !!exporting} onClick={() => runExport('pdf')}>{exporting === 'pdf' ? 'Making PDF…' : 'PDF'}</button>
+          <button className={btnPrimary} disabled={!svg || !!exporting} onClick={() => runExport('png')}>{exporting === 'png' ? 'Making PNG…' : 'Export PNG'}</button>
+        </>
+      ) : <button className={btnPrimary} onClick={tab === 'programme' ? exportProgramme : exportRisks}>Export CSV</button>}>
       <div className="flex-1 flex min-h-0">
         <Rail value={tab} onChange={id => setTab(id as Tab)} items={[
-          { id: 'programme', icon: 'gantt', label: 'Programme (critical path)' },
+          { id: 'programme', icon: 'gantt', label: 'Programme (bar chart)' },
+          { id: 'network', icon: 'method', label: 'Critical path diagram' },
           { id: 'risks', icon: 'risk', label: 'Risk register' },
         ]} />
 
@@ -108,30 +161,44 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </div>
               )}
             </main>
-            <Panel>
-              <Section title="Activities">
-                {acts.map(a => (
-                  <div key={a.id} style={{ background: UI.raised }} className="rounded-[var(--ui-r)] p-2 space-y-1.5">
-                    <div className="flex gap-1 items-center">
-                      <span className="w-5 text-center text-[11px]" style={{ color: UI.dim, fontFamily: MONO }}>{a.id}</span>
-                      <input className={inputCls} value={a.name} onChange={e => patchAct(a.id, { name: e.target.value })} />
-                      <button title="Remove activity" onClick={() => removeAct(a.id)} style={{ color: UI.dim }} className="px-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <label className="text-[10px]" style={{ color: UI.dim }}>Days<input type="number" min={0} className={`${inputCls} mt-0.5`} value={a.days} onChange={e => patchAct(a.id, { days: Math.max(0, num(e.target.value)) })} /></label>
-                      <label className="text-[10px]" style={{ color: UI.dim }}>After (#, comma-separated)
-                        <input className={`${inputCls} mt-0.5`} value={predText[a.id] ?? a.preds.join(', ')}
-                          onChange={e => { setPredText(t => ({ ...t, [a.id]: e.target.value })); patchAct(a.id, { preds: parsePreds(e.target.value) }); }}
-                          onBlur={() => setPredText(t => { const n = { ...t }; delete n[a.id]; return n; })} />
-                      </label>
-                    </div>
+            <Panel>{activitiesSection}</Panel>
+          </>
+        ) : tab === 'network' ? (
+          <>
+            <main className="flex-1 min-w-0 overflow-auto p-6" style={{ background: UI.bg }}>
+              {sched.error ? (
+                <Empty icon="risk" title="Can’t build the diagram" hint={sched.error} />
+              ) : acts.length === 0 ? (
+                <Empty icon="gantt" title="No activities" hint="Add activities in the panel on the right." />
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3 max-w-3xl">
+                    <Stat label="Total duration" value={String(sched.total)} unit="days" />
+                    <Stat label="Critical activities" value={`${critical} / ${acts.length}`} tone="warn" />
+                    <Stat label="Boxes" value={String(acts.length + 2)} />
                   </div>
-                ))}
-                <div className="flex gap-2">
-                  <button className={btnGhost} onClick={() => setActs(a => [...a, { id: nextId(a), name: 'New activity', days: 1, preds: a.length ? [a[a.length - 1].id] : [] }])}>Add activity</button>
-                  <button className={btnGhost} onClick={() => { setActs(withIds(SAMPLE_ACTIVITIES)); setPredText({}); }}>Load sample</button>
+                  <div style={{ background: '#fff', color: '#000' }} className="rounded-2xl p-3 overflow-auto shadow-[var(--ui-shadow)]">
+                    <div style={diag.fit ? { width: '100%', maxWidth: svgSize.w } : { width: svgSize.w }}
+                      dangerouslySetInnerHTML={{ __html: diag.fit ? svg.replace(/width="\d+(?:\.\d+)?" height="\d+(?:\.\d+)?"/, 'width="100%" style="height:auto;display:block"') : svg }} />
+                  </div>
+                  <p className="text-[11px]" style={{ color: UI.dim }}>Each box: <b>ES · duration · EF</b> on top, <b>LS · float · LF</b> underneath, activity name in the middle. Arrows run from an activity to the ones that depend on it.</p>
                 </div>
+              )}
+            </main>
+            <Panel>
+              <Section title="Diagram">
+                <Segmented value={diag.fit ? 'fit' : 'actual'} onChange={v => setDiag(d => ({ ...d, fit: v === 'fit' }))} options={[{ id: 'fit', label: 'Fit to width' }, { id: 'actual', label: 'Actual size' }]} />
+                <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" checked={diag.titleKey} onChange={e => setDiag(d => ({ ...d, titleKey: e.target.checked }))} />Add title and key</label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" checked={diag.highlight} onChange={e => setDiag(d => ({ ...d, highlight: e.target.checked }))} />Highlight critical path in red</label>
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <button className={btnPrimary} disabled={!svg || !!exporting} onClick={() => runExport('png')}>PNG</button>
+                  <button className={btnGhost} disabled={!svg || !!exporting} onClick={() => runExport('pdf')}>PDF</button>
+                  <button className={btnGhost} disabled={!svg || !!exporting} onClick={() => runExport('svg')}>SVG</button>
+                </div>
+                {exportErr && <p className="text-xs" style={{ color: UI.danger }}>{exportErr}</p>}
+                <p className="text-[11px] leading-relaxed" style={{ color: UI.dim }}>Exports are black and white on a white page by default. PNG is high resolution for reports; SVG stays sharp at any size; PDF fits one landscape page.</p>
               </Section>
+              {activitiesSection}
             </Panel>
           </>
         ) : (
@@ -181,8 +248,8 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </>
         )}
       </div>
-      <StatusBar left={<span style={{ color: UI.text }}>{tab === 'programme' ? 'Programme' : 'Risk register'}</span>}
-        right={<span>{tab === 'programme' ? (sched.error ? 'check predecessors' : `${acts.length} activities · ${sched.total} days`) : `${risks.length} hazards`}</span>} />
+      <StatusBar left={<span style={{ color: UI.text }}>{tab === 'programme' ? 'Programme' : tab === 'network' ? 'Critical path diagram' : 'Risk register'}</span>}
+        right={<span>{tab !== 'risks' ? (sched.error ? 'check predecessors' : `${acts.length} activities · ${sched.total} days`) : `${risks.length} hazards`}</span>} />
     </Screen>
   );
 };

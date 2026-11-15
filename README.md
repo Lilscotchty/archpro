@@ -100,3 +100,7 @@ npm run build
 ```
 
 Set `GEMINI_API_KEY` in `.env.local` if you use the Gemini features.
+
+## Critical path diagram (Method Study)
+
+The **Critical path diagram** tab draws the programme as a standard activity-on-node network: each box shows ES, duration and EF on top, LS, float and LF underneath, and the activity name in the middle, with Start and End boxes and arrows between dependent activities. Export as PNG, PDF (one landscape page) or SVG. Exports are black and white by default; optional title, key and red critical-path highlighting. Tests: `npm run test:cpm`.
