@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import { BoqState } from './useBoqState';
 import { Card, Check, Lbl, Select, TextInput } from './fields';
 import { Empty, Tag, UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
-import { AiExtraction, DEFAULT_GROQ_MODEL, resolveModel, analyseDrawing, applyExtraction, listGroqModels, mergeExtractions } from '../../utils/boq/ai';
+import { AiExtraction, DEFAULT_GROQ_MODEL, resolveModel, analyseDrawing, applyExtraction, listGroqModels, mergeExtractions, testVision } from '../../utils/boq/ai';
 import { rasterizeForAi } from '../../utils/boq/rasterize';
 import { DrawingMeta } from '../../utils/drawings/types';
 import { getDrawingBlob, listDrawings, subscribe } from '../../utils/drawings/store';
@@ -49,6 +49,13 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
     setError('');
     try { const l = await listGroqModels(key.trim()); setModels(l); if (!l.includes(model)) setError('The selected model is not in your Groq model list. Pick a vision-capable model (qwen/qwen3.6-27b is the current one).'); }
     catch (e) { setError((e as Error).message); }
+  };
+
+  const [test, setTest] = useState('');
+  const runTest = async () => {
+    setTest('Testing with your key…'); setError('');
+    try { const r = await testVision(key.trim(), model); setTest((r.ok ? 'OK: ' : 'Failed: ') + r.message); if (r.ok && r.modelUsed !== model) saveModel(r.modelUsed); }
+    catch (e) { setTest('Failed: ' + (e as Error).message); }
   };
 
   const run = async () => {
@@ -97,7 +104,11 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
           {models.length ? <Select value={model} onChange={saveModel} options={models.map(m => [m, m] as [string, string])} /> : <TextInput value={model} onChange={saveModel} />}
         </Lbl>
         <Check checked={remember} onChange={r => { setRemember(r); lsSet(K_KEY, r ? key : ''); }} label="Remember the key on this device" />
-        <div><button className={btnGhost} onClick={loadModels} disabled={!key.trim()}>Check key and list models</button></div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className={btnGhost} onClick={loadModels} disabled={!key.trim()}>Check key and list models</button>
+          <button className={btnGhost} onClick={runTest} disabled={!key.trim()}>Test image reading</button>
+          <span className="text-xs" style={{ color: test.startsWith('OK') ? UI.ok : UI.dim }}>{test}</span>
+        </div>
       </Card>
       <Card title="Drawing">
         <Lbl label="Stored drawing (by designated id)" hint="Drawings from the Drafting Studio, Elevation Studio, auto-generated and uploaded ones.">

@@ -273,3 +273,21 @@ export async function analyseDrawing(opts: { apiKey: string; model: string; imag
   }
   throw lastErr;
 }
+
+/** Live check with the person's real key: draws a small image containing a number and asks the model to read it back. */
+export async function testVision(apiKey: string, model: string): Promise<{ ok: boolean; modelUsed: string; message: string }> {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 120;
+  const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, 320, 120); g.fillStyle = '#000'; g.font = 'bold 72px sans-serif'; g.fillText('4817', 40, 88);
+  const url = c.toDataURL('image/jpeg', 0.9);
+  const candidates = [resolveModel(model), ...VISION_FALLBACKS].filter((m, i, a) => a.indexOf(m) === i);
+  let last = '';
+  for (const m of candidates) {
+    try {
+      const json = await post(`${GROQ_BASE}/chat/completions`, apiKey, { model: m, temperature: 0, max_completion_tokens: 2000,
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'What number is written in this image? Reply with the digits only.' }, { type: 'image_url', image_url: { url } }] }] });
+      const out = String(json?.choices?.[0]?.message?.content ?? '').replace(/<think>[\s\S]*?<\/think>/gi, '');
+      return out.includes('4817') ? { ok: true, modelUsed: m, message: `${m} can read images with your key.` } : { ok: false, modelUsed: m, message: `${m} answered "${out.trim().slice(0, 60)}", not 4817. It is not reading images reliably.` };
+    } catch (e) { last = (e as Error).message; }
+  }
+  return { ok: false, modelUsed: candidates[0], message: last };
+}
