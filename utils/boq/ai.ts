@@ -6,7 +6,15 @@
 import { Assumptions, BoqModel, OpeningRow, WallRow } from './types';
 
 export const GROQ_BASE = 'https://api.groq.com/openai/v1';
-export const DEFAULT_GROQ_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+// Groq retired Llama 4 Scout (17 Jul 2026) and Maverick (9 Mar 2026). Qwen 3.6 27B is Groq's recommended replacement and
+// accepts images (max 3 per request, 20 MB). Models are tried in this order if the chosen one cannot read images.
+export const DEFAULT_GROQ_MODEL = 'qwen/qwen3.6-27b';
+export const VISION_FALLBACKS = ['qwen/qwen3.6-27b'];
+const RETIRED_MODELS = /llama-4-scout|llama-4-maverick|llama-3\.2-.*vision/i;
+/** Map a stored or typed model id to one that can still read images. */
+export function resolveModel(m: string): string { return !m.trim() || RETIRED_MODELS.test(m) ? DEFAULT_GROQ_MODEL : m.trim(); }
+/** Ids from Groq's list that are not chat/vision models (speech, guard, embeddings). */
+export const isChatModelId = (id: string) => !/whisper|tts|orpheus|guard|safeguard|embed|compound/i.test(id);
 
 export interface AiOpening { mark: string; widthMm: number; heightMm: number | null; count: number; external: boolean | null; description: string | null }
 export interface AiExtraction {
@@ -61,7 +69,7 @@ const num = (v: unknown): number | null => {
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
 export function extractJson(text: string): unknown {
-  const t = text.replace(/```json|```/gi, '').trim();
+  const t = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```json|```/gi, '').trim();
   try { return JSON.parse(t); } catch { /* fall through */ }
   const s = t.indexOf('{'), e = t.lastIndexOf('}');
   if (s >= 0 && e > s) return JSON.parse(t.slice(s, e + 1));
@@ -218,28 +226,50 @@ export async function listGroqModels(apiKey: string): Promise<string[]> {
   const res = await fetch(`${GROQ_BASE}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
   if (!res.ok) throw new Error(res.status === 401 ? 'Groq rejected the API key (401).' : `Could not list models (${res.status}).`);
   const j = await res.json();
-  return (j.data as { id: string }[]).map(m => m.id).sort();
+  return (j.data as { id: string }[]).map(m => m.id).filter(isChatModelId).sort();
 }
 
-export async function analyseDrawing(opts: { apiKey: string; model: string; imageDataUrl: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string }> {
-  const body: Record<string, unknown> = {
-    model: opts.model, temperature: 0, max_completion_tokens: 3000,
-    messages: [
-      { role: 'system', content: SYSTEM },
-      { role: 'user', content: [{ type: 'text', text: buildPrompt(opts.hint) }, { type: 'image_url', image_url: { url: opts.imageDataUrl } }] },
-    ],
-    response_format: { type: 'json_object' },
-  };
-  let json: any;
-  try { json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal); }
-  catch (e) {
-    // some models reject JSON mode together with images: retry once in plain mode
-    if ((e as any).status === 400 && /response_format|json/i.test(String((e as any).detail))) {
-      delete body.response_format; json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal);
-    } else throw e;
+const NOT_VISION = /must be a string|image|vision|multimodal|content.*(array|string)/i;
+const GONE = /decommission|deprecat|no longer supported|not found|does not exist|model_not_found/i;
+
+export async function analyseDrawing(opts: { apiKey: string; model: string; imageDataUrl: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string; modelUsed: string }> {
+  const first = resolveModel(opts.model);
+  const candidates = [first, ...VISION_FALLBACKS.filter(m => m !== first)];
+  let lastErr: unknown;
+  for (const model of candidates) {
+    const body: Record<string, unknown> = {
+      model, temperature: 0, max_completion_tokens: 8000,
+      messages: [
+        { role: 'system', content: SYSTEM },
+        { role: 'user', content: [{ type: 'text', text: buildPrompt(opts.hint) }, { type: 'image_url', image_url: { url: opts.imageDataUrl } }] },
+      ],
+      response_format: { type: 'json_object' },
+    };
+    try {
+      let json: any;
+      try { json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal); }
+      catch (e) {
+        // some models reject JSON mode together with images: retry once in plain mode
+        const d = String((e as any).detail);
+        if ((e as any).status === 400 && /response_format|json_object|json mode/i.test(d) && !/must be a string/i.test(d)) {
+          delete body.response_format; json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal);
+        } else throw e;
+      }
+      const raw: string = json?.choices?.[0]?.message?.content ?? '';
+      if (!raw.trim()) throw new Error(`${model} returned an empty reply (it may have used its whole token budget thinking). Try again or use a smaller page.`);
+      const ex = normalise(extractJson(raw));
+      ex.warnings.push(...crossCheck(ex));
+      return { extraction: ex, raw, modelUsed: model };
+    } catch (e) {
+      lastErr = e;
+      const status = (e as any).status, d = String((e as any).detail ?? (e as Error).message);
+      const modelProblem = (status === 400 && NOT_VISION.test(d)) || ((status === 400 || status === 404) && GONE.test(d));
+      if (!modelProblem || model === candidates[candidates.length - 1]) {
+        if (modelProblem) throw new Error(`"${model}" cannot read images on your Groq account (${d.slice(0, 160)}). Choose a vision model such as ${DEFAULT_GROQ_MODEL} in the Model box.`);
+        throw e;
+      }
+      // otherwise fall through to the next vision-capable candidate
+    }
   }
-  const raw: string = json?.choices?.[0]?.message?.content ?? '';
-  const ex = normalise(extractJson(raw));
-  ex.warnings.push(...crossCheck(ex));
-  return { extraction: ex, raw };
+  throw lastErr;
 }
