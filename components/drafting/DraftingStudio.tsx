@@ -25,6 +25,7 @@ import { ScalePanel, Tool } from './ScalePanel';
 import { StartScreen } from './StartScreen';
 
 const Simulation3D = React.lazy(() => import('../sim/Simulation3D'));
+const LiveView = React.lazy(() => import('../sim/LiveView'));
 
 type Hist = ReturnType<typeof useHistory<ProjectState>>;
 export interface StudioProps {
@@ -62,7 +63,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
   const project = hist.state;
   const { commit, apply, checkpoint, dropCheckpoint, undo, redo } = hist;
 
-  const [mode, setMode] = useState<'2d' | '3d'>('2d');
+  const [mode, setMode] = useState<'2d' | 'split' | '3d'>('2d');
   const [tool, setToolState] = useState<Tool>('wall');
   const [view, setView] = useState<View>({ x: RULER + 40, y: RULER + 40, z: 0.05 });
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -88,6 +89,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
   const [saveState, setSaveState] = useState('');
   const [resume, setResume] = useState<{ savedAt: number; walls: number } | null>(null);
   const [fitTick, setFitTick] = useState(0);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -132,7 +134,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
     setView({ z, x: RULER + (size.w - RULER) / 2 - ((x0 + x1) / 2) * z, y: RULER + (size.h - RULER) / 2 - ((y0 + y1) / 2) * z });
   }, [project.elements, project.imageWidth, project.imageHeight, u, size]);
 
-  useEffect(() => { if (started && mode === '2d' && size.w > 100) fit(); }, [fitTick, started, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (started && mode !== '3d' && size.w > 100) fit(); }, [fitTick, started, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return;
@@ -349,7 +351,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
 
   // ------------------------------------------------------------------ keyboard
   useEffect(() => {
-    if (!started || mode !== '2d') return;
+    if (!started || mode === '3d') return;
     const typing = (el: EventTarget | null) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
     const kd = (e: KeyboardEvent) => {
       const inCmd = e.target === cmdRef.current;
@@ -471,7 +473,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
   }, [snapRes, mouse, marks, ghost, box, picks, start, tool, cmd, calPts]);
 
   useEffect(() => {
-    const c = canvasRef.current; if (!c || mode !== '2d') return;
+    const c = canvasRef.current; if (!c || mode === '3d') return;
     const dpr = window.devicePixelRatio || 1;
     if (c.width !== Math.round(size.w * dpr) || c.height !== Math.round(size.h * dpr)) { c.width = Math.round(size.w * dpr); c.height = Math.round(size.h * dpr); }
     const ctx = c.getContext('2d'); if (!ctx) return;
@@ -507,7 +509,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
       <button className={btnGhost} onClick={savePlanFile} title="Save plan file (Ctrl+S)"><span className="inline-flex items-center gap-1.5"><DIcon n="save" s={14} />Save</span></button>
       <input ref={openRef} type="file" accept=".json,application/json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void openPlanFile(f); e.target.value = ''; }} />
       <span className="w-px h-5 mx-1" style={{ background: UI.rule }} />
-      <div className="w-40"><Segmented value={mode} onChange={v => { setMode(v as '2d' | '3d'); setStart(null); }} options={[{ id: '2d', label: '2D plan' }, { id: '3d', label: '3D model' }]} /></div>
+      <div className="w-60"><Segmented value={mode} onChange={v => { setMode(v as '2d' | 'split' | '3d'); setStart(null); }} options={[{ id: '2d', label: '2D' }, { id: 'split', label: '2D + 3D' }, { id: '3d', label: '3D' }]} /></div>
       <button className={btnGhost} onClick={makeFoundationSheet}>Foundation plan</button>
       <button className={btnGhost} onClick={() => onElevations(elevationHandoff(project))}>Elevations</button>
     </>
@@ -569,8 +571,17 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
             </div>
           </div>
 
+          {/* live 3D, rebuilt from the plan as you draw */}
+          {mode === 'split' && (
+            <div style={{ borderColor: UI.rule, width: '40%', minWidth: 300 }} className="relative border-l shrink-0">
+              <Suspense fallback={<div className="h-full grid place-items-center text-xs" style={{ color: UI.dim, fontFamily: MONO }}>Loading 3D engine…</div>}>
+                <LiveView project={project} selectedId={[...sel][0] ?? null} onSelect={id => setSel(id ? new Set([id]) : new Set())} onChange={commit} />
+              </Suspense>
+            </div>
+          )}
+
           {/* right panel */}
-          <Panel width="w-72">
+          {panelOpen && <Panel width="w-72">
             {(tool === 'door' || tool === 'window') && (
               <Section title={tool === 'door' ? 'Door options' : 'Window options'}>
                 <Row label="Width"><NumField value={openW[tool]} suffix="mm" min={300} max={6000} onCommit={n => setOpenW(w => ({ ...w, [tool]: n }))} /></Row>
@@ -606,12 +617,12 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
               <Check checked={layers.openings} onChange={v => setLayers(l => ({ ...l, openings: v }))}>Doors and windows</Check>
               <Check checked={layers.dims} onChange={v => setLayers(l => ({ ...l, dims: v }))}>Wall dimensions</Check>
             </Section>
-          </Panel>
+          </Panel>}
         </div>
       )}
 
       {/* command line */}
-      {mode === '2d' && (
+      {mode !== '3d' && (
         <div style={{ background: UI.panel, borderColor: UI.rule, fontFamily: MONO }} className="border-t flex items-center gap-2 px-3 h-9 shrink-0">
           <span style={{ color: UI.accent }}>{TOOLS.find(x => x.id === tool)?.label.toLowerCase()}:</span>
           <input ref={cmdRef} value={cmd} onChange={e => setCmd(e.target.value)} className="flex-1 bg-transparent outline-none text-xs" spellCheck={false}
@@ -621,7 +632,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
       )}
 
       <StatusBar
-        left={mode === '2d' ? <>
+        left={mode !== '3d' ? <>
           <span style={{ color: UI.text }} className="w-48">{cur ? `X ${fmtNum(cur.x)}   Y ${fmtNum(cur.y)}` : 'X –   Y –'}</span>
           {([['SNAP', 'F3', 'object'], ['GRID', 'F9', 'grid'], ['TRACK', 'F10', 'track'], ['ORTHO', 'F8', 'ortho']] as const).map(([l, k, f]) => (
             <button key={l} onClick={() => setSnapSet(s => ({ ...s, [f]: !s[f] }))} style={{ color: snapSet[f] ? UI.accent : UI.dim }} title={`${l} (${k})`}>{l} {k}</button>
@@ -631,6 +642,7 @@ export const DraftingStudio: React.FC<StudioProps> = ({ hist, started, setStarte
         right={<>
           {u ? <span style={{ color: u.calibrated ? UI.ok : UI.warn }}>{u.calibrated ? `Scale set · 1 px = ${u.mmPerPx.toFixed(2)} mm` : 'Scale not set'}</span> : <span>Blank sheet · mm</span>}
           <span>{stats.walls} walls · {stats.openings} openings</span>
+          {mode !== '3d' && <button onClick={() => setPanelOpen(o => !o)} style={{ color: panelOpen ? UI.accent : UI.dim }} title="Show or hide the properties panel">PANEL</button>}
           <span>{saveState}</span>
         </>} />
 

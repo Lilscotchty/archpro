@@ -38,7 +38,7 @@ export function hostWall(p: P, walls: WallSeg[], tol: number) {
 
 const area = (poly: P[]) => poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + (p.x * q.y - q.x * p.y); }, 0) / 2;
 
-function triangulate(poly: P[]): [P, P, P][] {
+export function triangulate(poly: P[]): [P, P, P][] {
   // ear clipping; polygon given CCW (positive area)
   const pts = poly.slice();
   const tris: [P, P, P][] = [];

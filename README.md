@@ -87,7 +87,9 @@ Model space is **real millimetres**, so quantities, 3D and drawings downstream a
 
 Shortcuts: V select, H pan, W wall, R room outline, D door, N window, G grid line, M measure, S set scale, A straighten, F fit, F3 snap, F8 ortho, F9 grid, F10 tracking, Ctrl+Z / Ctrl+Y undo / redo.
 
-Tests: `npm run test:drafting`.
+**2D + 3D split view:** the 3D model sits beside the plan and rebuilds as you draw. Selecting in either view selects in the other; roof type and pitch change in place. Hip roofs follow the plan outline (any simple closed shape, with hips, ridges and valleys from the equal-pitch 45-degree bisector rule).
+
+Tests: `npm run test:drafting`, `npm run test:sim`.
 
 ## Run
 

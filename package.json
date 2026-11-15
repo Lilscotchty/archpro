@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:sim": "tsx tests/sim-model.test.ts && tsx tests/sim-view.headless.test.tsx",
+    "test:sim": "tsx tests/sim-model.test.ts && tsx tests/sim-view.headless.test.tsx && tsx tests/sim-hip.test.ts",
     "test:drafting": "tsx scripts/drafting-selftest.ts"
   },
   "dependencies": {
