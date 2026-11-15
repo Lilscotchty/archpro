@@ -265,7 +265,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
       tabIndex={0} 
       onKeyDown={handleKeyDown} 
       onMouseEnter={handleMouseEnter} 
-      className="relative w-full h-full overflow-auto bg-[var(--ui-panel)] flex justify-center items-center  outline-none"
+      className="relative w-full h-full overflow-auto bg-[var(--ui-panel)] flex justify-center items-center outline-none"
     >
       {project.imageSrc ? (
         <canvas
@@ -275,7 +275,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ step, project, setPr
           onClick={handleCanvasClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverPos(null)}
-          className={` border border-[var(--ui-rule)] bg-white max-w-none flex-shrink-0 ${
+          className={`   bg-white max-w-none flex-shrink-0 ${
              currentTool === 'v-line' ? 'cursor-col-resize' : 
              currentTool === 'h-line' ? 'cursor-row-resize' : 
              'cursor-crosshair'

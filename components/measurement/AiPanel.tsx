@@ -113,7 +113,7 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; onEstimate?
 
   return (
     <div className="max-w-5xl mx-auto grid gap-3">
-      <div className="border rounded-[var(--ui-r)] p-3 text-xs" style={{ borderColor: UI.rule, background: UI.raised, color: UI.dim }}>
+      <div className="rounded-[var(--ui-r)] p-3 text-xs" style={{ background: UI.raised, color: UI.dim }}>
         The AI <b style={{ color: UI.text }}>reads</b> printed dimensions, door and window schedules, room labels and notes from the drawing. It does not measure by scale and it can misread. Everything it returns is checked,
         shown here for review, and only enters the bill when you apply it. Check the Quantities step afterwards. Your key stays in this browser. Gemini route: pages go to Google. Text route: only the extracted text goes to Groq.
       </div>
@@ -154,11 +154,11 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; onEstimate?
           <span className="text-xs" style={{ color: UI.dim }}>{progress}</span>
         </div>
       </Card>
-      {error && <div className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.danger, 24), background: tint(UI.danger, 6), color: UI.danger }}>{error}</div>}
-      {thumbs.length > 0 && <div className="flex gap-2 overflow-x-auto">{thumbs.map((t, i) => <img key={i} src={t} alt={`page ${from + i}`} className="h-28 border rounded-[var(--ui-r)]" style={{ borderColor: UI.rule, background: '#fff' }} />)}</div>}
+      {error && <div className="text-xs rounded-[var(--ui-r)] p-2" style={{ background: tint(UI.danger, 6), color: UI.danger }}>{error}</div>}
+      {thumbs.length > 0 && <div className="flex gap-2 overflow-x-auto">{thumbs.map((t, i) => <img key={i} src={t} alt={`page ${from + i}`} className="h-28 rounded-[var(--ui-r)]" style={{ background: '#fff' }} />)}</div>}
 
       {result ? (
-        <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] p-3 text-xs space-y-3">
+        <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] p-3 text-xs space-y-3">
           <div className="flex items-center gap-2"><span className="font-semibold" style={{ color: 'var(--ui-strong)' }}>What the AI read</span><Tag tone="warn">review</Tag><Tag>{result.drawingType}</Tag>{result.scale && <Tag>{result.scale}</Tag>}</div>
           {result.warnings.length > 0 && <ul className="space-y-1" style={{ color: UI.warn }}>{result.warnings.map((w, i) => <li key={i}>• {w}</li>)}</ul>}
           <div className="grid grid-cols-2 gap-3">

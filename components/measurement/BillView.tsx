@@ -32,14 +32,14 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
         s.built.geo.warnings.forEach(x => items.push({ tone: 'warn', text: x }));
         if (!items.length) return null;
         const c = items.some(i => i.tone === 'danger') ? UI.danger : UI.warn;
-        return <div className="text-xs border rounded-[var(--ui-r)] p-3" style={{ borderColor: tint(c, 24), background: tint(c, 6) }}>
+        return <div className="text-xs rounded-[var(--ui-r)] p-3" style={{ background: tint(c, 6) }}>
           <div className="font-semibold mb-1" style={{ color: c }}>Check before you use this total ({items.length})</div>
           <ul className="space-y-1" style={{ color: UI.text }}>{items.map((i, k) => <li key={k} className="flex gap-2"><span style={{ color: i.tone === 'danger' ? UI.danger : UI.warn }}>•</span><span>{i.text}</span></li>)}</ul>
         </div>;
       })()}
       {total.map(sec => (
-        <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: UI.rule, background: UI.raised }}>
+        <div key={sec.code} style={{ background: UI.panel }} className="rounded-[var(--ui-r)] overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2" style={{ background: UI.raised }}>
             <div className="text-xs font-semibold" style={{ color: 'var(--ui-strong)' }}><span style={{ fontFamily: MONO, color: UI.warn }}>{sec.code}</span> &nbsp; {sec.title}</div>
             <div className="text-xs" style={{ fontFamily: MONO }}>{cur} {fmt(sec.total)}</div>
           </div>
@@ -52,7 +52,7 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
             <tbody>
               {sec.lines.map((l, i) => (
                 <React.Fragment key={l.key}>
-                  <tr style={{ borderColor: UI.rule, opacity: l.omitted ? 0.4 : 1 }} className="border-t align-top">
+                  <tr style={{ opacity: l.omitted ? 0.4 : 1 }} className="align-top">
                     <td className="px-3 py-2" style={{ fontFamily: MONO, color: UI.dim }}>{refOf(sec.code, i)}</td>
                     <td className="px-2 py-2 cursor-pointer" onClick={() => setOpen(open === l.key ? null : l.key)}>
                       <span style={{ textDecoration: l.omitted ? 'line-through' : 'none' }}>{l.description}</span>{' '}
@@ -89,7 +89,7 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
         </div>
       ))}
 
-      <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] p-3">
+      <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] p-3">
         <div className="text-xs font-semibold mb-2" style={{ color: 'var(--ui-strong)' }}>Add your own item</div>
         <div className="grid grid-cols-12 gap-2 items-end">
           <div className="col-span-3"><Select value={nl.section} onChange={v => setNl({ ...nl, section: v })} options={SECTIONS.map(x => [x.code, `${x.code} ${x.title}`] as [string, string])} /></div>

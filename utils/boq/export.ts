@@ -44,7 +44,7 @@ export function printBill(s: Summary, mk: Markups, a: Assumptions, gfa: number, 
     <tr class="tot"><td></td><td colspan="4">Total carried to summary</td><td class="n">${plain(sec.total)}</td></tr></tbody></table>`).join('');
   const sumRows = s.sections.map(x => `<tr><td class="ref">${x.code}</td><td>${html(x.title)}</td><td class="n">${plain(x.total)}</td></tr>`).join('');
   const doc = `<!doctype html><html><head><meta charset="utf-8"><title>Bill of quantities - ${html(a.projectName)}</title><style>
-    @page{size:A4;margin:14mm 12mm} body{font:11px/1.4 "IBM Plex Sans",Arial,sans-serif;color:#111} h1{font-size:20px;margin:0 0 2px} h2{font-size:12px;margin:18px 0 6px;border-bottom:2px solid #111;padding-bottom:3px;page-break-after:avoid}
+    @page{size:A4;margin:14mm 12mm} body{font:11px/1.4 Nunito,Arial,sans-serif;color:#111} h1{font-size:20px;margin:0 0 2px} h2{font-size:12px;margin:18px 0 6px;border-bottom:2px solid #111;padding-bottom:3px;page-break-after:avoid}
     table{width:100%;border-collapse:collapse;margin-bottom:6px} th{text-align:left;border-bottom:1px solid #111;padding:3px 4px;font-size:10px} td{padding:4px;border-bottom:1px solid #ddd;vertical-align:top}
     .ref{width:54px;font-family:monospace} .n{text-align:right;width:78px;font-family:monospace} .u{width:48px} .w{color:#666;font-size:9px;font-family:monospace;margin-top:1px} tr{page-break-inside:avoid}
     .tot td{font-weight:700;border-top:1px solid #111;border-bottom:none} .meta{color:#444;margin-bottom:14px} .grand td{font-weight:700;font-size:13px;border-top:2px solid #111} ol{padding-left:16px} li{margin-bottom:3px}

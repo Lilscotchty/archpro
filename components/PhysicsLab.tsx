@@ -51,15 +51,15 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   <Stat label="Total resistance R" value={f2(th.rTotal)} unit="m²K/W" />
                   <Stat label={`Heat loss (${area} m², ΔT ${dT} K)`} value={Math.round(th.heatLossW).toLocaleString()} unit="W" />
                 </div>
-                <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
+                <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] overflow-hidden">
                   <table className="w-full text-xs">
-                    <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
+                    <thead style={{ color: UI.dim }} className=""><tr>
                       <th className={thCls}>Layer</th><th className={`${thCls} w-24 text-right`}>Thickness</th><th className={`${thCls} w-24 text-right`}>λ W/mK</th><th className={`${thCls} w-24 text-right`}>R m²K/W</th>
                     </tr></thead>
                     <tbody>
-                      <tr style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><td className={tdCls}>External surface (Rse)</td><td /><td /><td className={`${tdCls} text-right`} style={{ fontFamily: MONO }}>{f2(SURFACE_R[surface].rse, 3)}</td></tr>
+                      <tr style={{ color: UI.dim }} className=""><td className={tdCls}>External surface (Rse)</td><td /><td /><td className={`${tdCls} text-right`} style={{ fontFamily: MONO }}>{f2(SURFACE_R[surface].rse, 3)}</td></tr>
                       {layers.map((l, i) => (
-                        <tr key={i} style={{ borderColor: UI.rule }} className="border-b">
+                        <tr key={i} className="">
                           <td className={tdCls}>{l.name}</td>
                           <td className={`${tdCls} text-right`} style={{ fontFamily: MONO }}>{l.thicknessMm} mm</td>
                           <td className={`${tdCls} text-right`} style={{ fontFamily: MONO }}>{l.lambda}</td>
@@ -82,7 +82,7 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <Stat label="Max bending moment" value={f2(lr.momentKnM)} unit="kNm" />
                 <Stat label="Max shear / reaction" value={f2(lr.shearKn)} unit="kN" />
               </div>
-              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
+              <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] overflow-hidden">
                 <table className="w-full text-xs"><tbody>
                   {[
                     ['Self-weight', `${f2(lr.selfWeightKpa)} kN/m²`],
@@ -91,7 +91,7 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     [`Design load (${PARTIAL[code].label})`, `${f2(lr.uls)} kN/m²`],
                     ['Service reaction per support (Gk + Qk)', `${f2(lr.serviceKnM)} kN`],
                   ].map(([a, b]) => (
-                    <tr key={a} style={{ borderColor: UI.rule }} className="border-b last:border-b-0"><td className={tdCls}>{a}</td><td className={`${tdCls} text-right`} style={{ fontFamily: MONO }}>{b}</td></tr>
+                    <tr key={a} className=""><td className={tdCls}>{a}</td><td className={`${tdCls} text-right`} style={{ fontFamily: MONO }}>{b}</td></tr>
                   ))}
                 </tbody></table>
               </div>
@@ -105,14 +105,14 @@ export const PhysicsLab: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <Stat label="Embodied carbon (A1–A3, indicative)" value={Math.round(total).toLocaleString()} unit="kgCO₂e" />
                 <Stat label="In tonnes" value={f2(total / 1000)} unit="tCO₂e" />
               </div>
-              <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
+              <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
+                  <thead style={{ color: UI.dim }} className=""><tr>
                     <th className={thCls}>Material</th><th className={`${thCls} w-28 text-right`}>Quantity</th><th className={`${thCls} w-24 text-right`}>Factor</th><th className={`${thCls} w-28 text-right`}>kgCO₂e</th><th className="w-8" />
                   </tr></thead>
                   <tbody>
                     {rows.map((r, i) => (
-                      <tr key={i} style={{ borderColor: UI.rule }} className="border-b last:border-b-0">
+                      <tr key={i} className="">
                         <td className="px-2 py-1"><input className={inputCls} value={r.name} onChange={e => patchRow(i, { name: e.target.value })} /></td>
                         <td className="px-2 py-1"><div className="flex items-center gap-1"><input type="number" className={`${inputCls} text-right`} value={r.qty} onChange={e => patchRow(i, { qty: num(e.target.value) })} /><span style={{ color: UI.dim }}>{r.unit}</span></div></td>
                         <td className="px-2 py-1"><input type="number" className={`${inputCls} text-right`} value={r.factor} onChange={e => patchRow(i, { factor: num(e.target.value) })} /></td>

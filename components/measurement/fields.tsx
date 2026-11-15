@@ -36,8 +36,8 @@ export const Lbl: React.FC<{ label: string; unit?: string; hint?: string; childr
 );
 
 export const Card: React.FC<{ title: string; note?: string; children: React.ReactNode }> = ({ title, note, children }) => (
-  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] p-3">
-    <div className="text-xs font-semibold mb-2" style={{ color: 'var(--ui-strong)' }}>{title}</div>
+  <div style={{ background: UI.panel, boxShadow: 'var(--ui-shadow)' }} className="rounded-2xl p-5">
+    <div className="text-sm font-bold mb-3" style={{ color: 'var(--ui-strong)' }}>{title}</div>
     {note && <div className="text-[11px] mb-2" style={{ color: UI.dim }}>{note}</div>}
     <div className="grid grid-cols-2 gap-x-3 gap-y-2">{children}</div>
   </div>

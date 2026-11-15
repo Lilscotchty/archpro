@@ -9,7 +9,7 @@ import { DEFAULT_COLORS, DEFAULT_SIM, MatKey, PlanEl, SimPart, SimSettings } fro
 import { ArchElement, ProjectState } from '../../types';
 
 const C = { bg: 'var(--ui-bg)', panel: 'var(--ui-panel)', rule: 'var(--ui-rule)', text: 'var(--ui-text)', dim: 'var(--ui-dim)', accent: 'var(--ui-accent)', raised: 'var(--ui-raised)', warn: 'var(--ui-warn)', danger: 'var(--ui-danger)' };
-const MONO = 'ui-monospace, "IBM Plex Mono", Consolas, monospace';
+const MONO = 'Nunito, "Segoe UI", system-ui, sans-serif';
 
 const ICON: Record<string, string> = {
   select: 'M5 3l14 8-6 2-2 6z',
@@ -30,13 +30,13 @@ const RailBtn: React.FC<{ on?: boolean; title: string; onClick: () => void; chil
     className="w-9 h-9 grid place-items-center rounded-[var(--ui-r)] hover:brightness-125 focus-visible:outline outline-2 outline-offset-1">{children}</button>
 );
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div style={{ borderColor: C.rule }} className="border-b px-3 py-2.5"><div className="text-xs font-semibold mb-1.5">{title}</div>{children}</div>
+  <div className="px-3 py-2.5"><div className="text-xs font-semibold mb-1.5">{title}</div>{children}</div>
 );
 const Num: React.FC<{ label: string; value: number; onChange: (n: number) => void; step?: number; min?: number }> = ({ label, value, onChange, step = 1, min }) => (
   <label className="flex items-center justify-between gap-2 py-1 text-xs" style={{ color: C.dim }}>
     {label}
     <input type="number" value={Number.isFinite(value) ? value : 0} step={step} min={min} onChange={e => onChange(Number(e.target.value))}
-      style={{ background: C.bg, borderColor: C.rule, color: C.text, fontFamily: MONO }} className="w-20 px-1.5 py-1 border rounded-[var(--ui-r)] text-right" />
+      style={{ background: C.bg, color: C.text, fontFamily: MONO }} className="w-20 px-1.5 py-1 rounded-[var(--ui-r)] text-right" />
   </label>
 );
 const Check: React.FC<{ label: string; on: boolean; onChange: (v: boolean) => void }> = ({ label, on, onChange }) => (
@@ -48,7 +48,7 @@ const Slider: React.FC<{ label: string; value: number; min: number; max: number;
     <input type="range" min={min} max={max} value={value} onChange={e => onChange(Number(e.target.value))} className="w-full" />
   </label>
 );
-const btn = 'px-3 py-1.5 text-xs border rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)]';
+const btn = 'px-3 py-1.5 text-xs  rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)]';
 
 const MAT_LABEL: Record<MatKey, string> = { wall: 'Walls', slab: 'Floor slabs', roof: 'Roof', door: 'Doors', frame: 'Frames', glass: 'Glass', plinth: 'Plinth', column: 'Columns', ground: 'Ground' };
 const KIND_LABEL: Record<string, string> = { wall: 'Walls', door: 'Doors', window: 'Windows', slab: 'Slabs', roof: 'Roof', column: 'Columns' };
@@ -142,7 +142,7 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
   return (
     <div className="flex-1 flex min-h-0">
       {/* ---------------------------------------------- tool rail */}
-      <nav style={{ background: C.panel, borderColor: C.rule }} className="w-12 border-r flex flex-col items-center py-2 gap-1 shrink-0">
+      <nav style={{ background: C.panel, }} className="w-12 flex flex-col items-center py-2 gap-1 shrink-0">
         <RailBtn title="Orbit (left-drag) · look (right-drag) · pan (middle-drag)" on={!fly} onClick={() => setFly(false)}><Ico n="select" /></RailBtn>
         <RailBtn title="Fly mode: WASD + Q/E to move, right-drag to look" on={fly} onClick={() => setFly(f => !f)}><Ico n="fly" /></RailBtn>
         <div style={{ background: C.rule }} className="w-6 h-px my-1" />
@@ -159,21 +159,21 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
       <div className="flex-1 relative min-w-0">
         <SimView model={model} colors={colors} wireframe={wireframe} shadows={shadows} grid={grid} showRoof={showRoof} hiddenLevels={hiddenLevels}
           sunAz={sunAz} sunEl={sunEl} ambient={ambient} fly={fly} selectedPartId={partId} selectedSourceId={selSource} frameKey={frameKey} onPick={pick} />
-        <div style={{ background: 'rgba(31,34,39,.9)', borderColor: C.rule, fontFamily: MONO }} className="absolute left-3 top-3 px-2.5 py-1.5 border rounded-[var(--ui-r)] text-xs pointer-events-none">
+        <div style={{ background: 'rgba(31,34,39,.9)', fontFamily: MONO }} className="absolute left-3 top-3 px-2.5 py-1.5 rounded-[var(--ui-r)] text-xs pointer-events-none">
           {fly ? 'Fly: WASD move · Q/E down/up · right-drag look · Shift = faster' : 'Left-drag orbit · right-drag look · middle-drag pan · wheel zoom · click to select'}
         </div>
         {model.stats.warnings.length > 0 && (
-          <div style={{ background: 'rgba(31,34,39,.92)', borderColor: C.warn, color: C.warn }} className="absolute left-3 bottom-3 max-w-md px-2.5 py-1.5 border rounded-[var(--ui-r)] text-xs space-y-0.5">
+          <div style={{ background: 'rgba(31,34,39,.92)', color: C.warn }} className="absolute left-3 bottom-3 max-w-md px-2.5 py-1.5 rounded-[var(--ui-r)] text-xs space-y-0.5">
             {model.stats.warnings.map((w, i) => <div key={i}>{w}</div>)}
           </div>
         )}
-        <div style={{ background: 'rgba(31,34,39,.9)', borderColor: C.rule, fontFamily: MONO, color: C.dim }} className="absolute right-3 top-3 px-2.5 py-1.5 border rounded-[var(--ui-r)] text-xs pointer-events-none">
+        <div style={{ background: 'rgba(31,34,39,.9)', fontFamily: MONO, color: C.dim }} className="absolute right-3 top-3 px-2.5 py-1.5 rounded-[var(--ui-r)] text-xs pointer-events-none">
           {model.stats.tris.toLocaleString()} tris · {model.stats.walls} walls · {model.stats.doors} doors · {model.stats.windows} windows
         </div>
       </div>
 
       {/* ---------------------------------------------- hierarchy + properties */}
-      <aside style={{ background: C.panel, borderColor: C.rule }} className="w-72 border-l overflow-y-auto shrink-0 text-xs">
+      <aside style={{ background: C.panel, }} className="w-72 overflow-y-auto shrink-0 text-xs">
         <Section title="Scene">
           <div className="max-h-44 overflow-y-auto -mx-1">
             {groups.length === 0 && <div style={{ color: C.dim }} className="px-1">Nothing to show yet. Draw walls or a rectangle in the 2D plan.</div>}
@@ -205,8 +205,8 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
               <Num label="Height (mm)" value={selEl.height ?? defH} step={50} onChange={n => patchEl(selEl.id, { height: Math.max(300, n) })} />
               {selEl.type === 'window' && <Num label="Sill (mm)" value={selEl.sill ?? extra.windowSillMm} step={50} onChange={n => patchEl(selEl.id, { sill: Math.max(0, n) })} />}
               <div className="mt-1.5 flex gap-2">
-                <button className={btn} style={{ borderColor: C.rule }} onClick={() => patchEl(selEl.id, { height: undefined, sill: undefined })}>Reset size</button>
-                <button className={btn} style={{ borderColor: C.danger, color: C.danger }} onClick={() => { onChange(pr => ({ ...pr, elements: pr.elements.filter(e => e.id !== selEl.id) })); onSelect(null); setPartId(null); }}><Ico n="trash" s={13} /></button>
+                <button className={btn} onClick={() => patchEl(selEl.id, { height: undefined, sill: undefined })}>Reset size</button>
+                <button className={btn} style={{ color: C.danger }} onClick={() => { onChange(pr => ({ ...pr, elements: pr.elements.filter(e => e.id !== selEl.id) })); onSelect(null); setPartId(null); }}><Ico n="trash" s={13} /></button>
               </div>
             </div>
           )}
@@ -229,7 +229,7 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
 
         <Section title="Roof">
           <label className="flex items-center justify-between gap-2 py-1" style={{ color: C.dim }}>Type
-            <select value={roofSpec.type} onChange={e => patchRoof({ type: e.target.value as typeof roofSpec.type })} style={{ background: C.bg, borderColor: C.rule, color: C.text }} className="w-28 px-1.5 py-1 border rounded-[var(--ui-r)]">
+            <select value={roofSpec.type} onChange={e => patchRoof({ type: e.target.value as typeof roofSpec.type })} style={{ background: C.bg, color: C.text }} className="w-28 px-1.5 py-1 rounded-[var(--ui-r)]">
               <option value="gable">Gable</option><option value="hip">Hip</option><option value="shed">Mono-pitch</option><option value="flat">Flat</option>
             </select>
           </label>
@@ -237,14 +237,14 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
           <Num label="Overhang (mm)" value={roofSpec.overhang} step={50} onChange={n => patchRoof({ overhang: Math.max(0, n) })} />
           {(roofSpec.type === 'gable' || roofSpec.type === 'hip') && (
             <label className="flex items-center justify-between gap-2 py-1" style={{ color: C.dim }}>Ridge
-              <select value={extra.ridge} onChange={e => setExtra(x => ({ ...x, ridge: e.target.value as typeof x.ridge }))} style={{ background: C.bg, borderColor: C.rule, color: C.text }} className="w-28 px-1.5 py-1 border rounded-[var(--ui-r)]">
+              <select value={extra.ridge} onChange={e => setExtra(x => ({ ...x, ridge: e.target.value as typeof x.ridge }))} style={{ background: C.bg, color: C.text }} className="w-28 px-1.5 py-1 rounded-[var(--ui-r)]">
                 <option value="auto">Longest side</option><option value="x">Left–right</option><option value="z">Up–down</option>
               </select>
             </label>
           )}
           {roofSpec.type === 'shed' && (
             <label className="flex items-center justify-between gap-2 py-1" style={{ color: C.dim }}>High side
-              <select value={extra.shedHigh} onChange={e => setExtra(x => ({ ...x, shedHigh: e.target.value as typeof x.shedHigh }))} style={{ background: C.bg, borderColor: C.rule, color: C.text }} className="w-28 px-1.5 py-1 border rounded-[var(--ui-r)]">
+              <select value={extra.shedHigh} onChange={e => setExtra(x => ({ ...x, shedHigh: e.target.value as typeof x.shedHigh }))} style={{ background: C.bg, color: C.text }} className="w-28 px-1.5 py-1 rounded-[var(--ui-r)]">
                 <option value="north">Top of plan</option><option value="south">Bottom of plan</option><option value="west">Left of plan</option><option value="east">Right of plan</option>
               </select>
             </label>
@@ -261,8 +261,8 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
         <Section title="Scale">
           <div style={{ color: C.dim }} className="mb-1">1 drawing unit = <span style={{ fontFamily: MONO, color: C.text }}>{mmPerUnit.toFixed(3)}</span> mm{planExtent > 0 && <> · plan {(planExtent * mmPerUnit / 1000).toFixed(1)} m across</>}</div>
           <div className="flex gap-2">
-            <input value={targetM} onChange={e => setTargetM(e.target.value)} placeholder="longest side, m" style={{ background: C.bg, borderColor: C.rule, color: C.text, fontFamily: MONO }} className="flex-1 min-w-0 px-1.5 py-1 border rounded-[var(--ui-r)]" />
-            <button className={btn} style={{ borderColor: C.rule }} onClick={applyScale}>Set</button>
+            <input value={targetM} onChange={e => setTargetM(e.target.value)} placeholder="longest side, m" style={{ background: C.bg, color: C.text, fontFamily: MONO }} className="flex-1 min-w-0 px-1.5 py-1 rounded-[var(--ui-r)]" />
+            <button className={btn} onClick={applyScale}>Set</button>
           </div>
           <div style={{ color: C.dim }} className="mt-1">Tracing over an uploaded image? Enter the real length of the building’s longest side.</div>
         </Section>
@@ -277,15 +277,15 @@ const Simulation3D: React.FC<Simulation3DProps> = ({ project, selectedId, onSele
           <div className="grid grid-cols-2 gap-x-3 gap-y-1">
             {(Object.keys(MAT_LABEL) as MatKey[]).map(k => (
               <label key={k} className="flex items-center justify-between gap-2" style={{ color: C.dim }}>{MAT_LABEL[k]}
-                <input type="color" value={colors[k]} onChange={e => setColors(c => ({ ...c, [k]: e.target.value }))} className="w-7 h-5 p-0 border-0 bg-transparent cursor-pointer" />
+                <input type="color" value={colors[k]} onChange={e => setColors(c => ({ ...c, [k]: e.target.value }))} className="w-7 h-5 p-0 bg-transparent cursor-pointer" />
               </label>
             ))}
           </div>
-          <button className={`${btn} mt-2`} style={{ borderColor: C.rule }} onClick={() => setColors(DEFAULT_COLORS)}>Reset colours</button>
+          <button className={`${btn} mt-2`} onClick={() => setColors(DEFAULT_COLORS)}>Reset colours</button>
         </Section>
 
         <Section title="Export">
-          <button className={`${btn} w-full`} style={{ borderColor: C.rule }} onClick={exportGLB}>Download .glb model</button>
+          <button className={`${btn} w-full`} onClick={exportGLB}>Download .glb model</button>
           <div style={{ color: C.dim }} className="mt-1">Opens in PlayCanvas, Blender, three.js and most 3D viewers. Units are metres.</div>
         </Section>
       </aside>

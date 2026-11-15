@@ -21,8 +21,8 @@ export const NumField: React.FC<{
       <input type="text" inputMode="decimal" disabled={disabled} value={txt} onFocus={e => { setFocus(true); e.currentTarget.select(); }}
         onChange={e => setTxt(e.target.value)} onBlur={() => { setFocus(false); commit(); }}
         onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } if (e.key === 'Escape') { setTxt(show(value)); e.currentTarget.blur(); } e.stopPropagation(); }}
-        style={{ background: UI.bg, borderColor: UI.rule, color: UI.text, fontFamily: MONO, paddingRight: suffix ? 30 : undefined }}
-        className="w-full px-2 py-1.5 border rounded-[var(--ui-r)] text-xs text-right focus:outline-none focus:border-[var(--ui-accent)] disabled:opacity-40" />
+        style={{ background: UI.bg, color: UI.text, fontFamily: MONO, paddingRight: suffix ? 30 : undefined }}
+        className="w-full px-2 py-1.5 rounded-[var(--ui-r)] text-xs text-right focus:outline-none disabled:opacity-40" />
       {suffix && <span className="absolute right-2 text-[10px] pointer-events-none" style={{ color: UI.dim }}>{suffix}</span>}
     </span>
   );

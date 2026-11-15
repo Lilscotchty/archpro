@@ -6,31 +6,37 @@
     <title>ArchPro</title>
     <style>
       :root { color-scheme: dark;
-        --ui-bg:#15171a; --ui-panel:#1f2227; --ui-raised:#181a1e; --ui-sunken:#0f1113; --ui-rule:rgba(255,255,255,.09); --ui-text:#c9cfd6; --ui-dim:#7d8590; --ui-strong:#e6e9ed;
-        --ui-accent:#4aa3ff; --ui-accentInk:#06121f; --ui-danger:#e5484d; --ui-dangerText:#ff9ea1; --ui-warn:#f5b83d; --ui-warnTint:#3a2f12; --ui-ok:#3ddb8a;
-        --ui-r:8px; --ui-shadow:0 1px 2px rgba(0,0,0,.25); --ui-hover:rgba(255,255,255,.05); --ui-hover2:rgba(255,255,255,.10); --ui-scroll:#2e333a; --ui-scrollHover:#3b424b; }
+        --ui-page:#0a0b0d; --ui-bg:#121417; --ui-panel:#1a1d21; --ui-raised:#1f2328; --ui-field:#262b31; --ui-sunken:#0f1114; --ui-rule:transparent;
+        --ui-text:#b9c0c8; --ui-dim:#7b848e; --ui-strong:#f3f5f7; --ui-accent:#f3f5f7; --ui-accentInk:#0c0e12; --ui-sel:#5aa9ff;
+        --ui-danger:#ef5a61; --ui-dangerText:#ff9ea1; --ui-warn:#f2b13c; --ui-warnTint:#3a2f12; --ui-ok:#3ddb8a;
+        --ui-r:14px; --ui-r2:28px; --ui-shadow:0 4px 24px rgba(0,0,0,.35); --ui-hover:rgba(255,255,255,.06); --ui-hover2:rgba(255,255,255,.10); --ui-scroll:#2c3238; --ui-scrollHover:#3a424a; }
       :root[data-theme="light"] { color-scheme: light;
-        --ui-bg:#f3f5f8; --ui-panel:#ffffff; --ui-raised:#eceff3; --ui-sunken:#dfe4ea; --ui-rule:rgba(15,23,32,.10); --ui-text:#2b323b; --ui-dim:#5b6673; --ui-strong:#0f1720;
-        --ui-accent:#0b6fe0; --ui-accentInk:#ffffff; --ui-danger:#c9272d; --ui-dangerText:#b42318; --ui-warn:#a85a00; --ui-warnTint:#fdf0d2; --ui-ok:#15803d;
-        --ui-r:8px; --ui-shadow:0 1px 2px rgba(15,23,32,.06), 0 1px 1px rgba(15,23,32,.04); --ui-hover:rgba(15,23,32,.06); --ui-hover2:rgba(15,23,32,.10); --ui-scroll:#c3cad3; --ui-scrollHover:#a9b2bd; }
+        --ui-page:#e9edf5; --ui-bg:#f4fafd; --ui-panel:#ffffff; --ui-raised:#eef4f8; --ui-field:#e8f0f5; --ui-sunken:#e1eaf0; --ui-rule:transparent;
+        --ui-text:#4a5563; --ui-dim:#7a8693; --ui-strong:#0c0e12; --ui-accent:#0d0f12; --ui-accentInk:#ffffff; --ui-sel:#2563eb;
+        --ui-danger:#d1343c; --ui-dangerText:#b42318; --ui-warn:#b45f06; --ui-warnTint:#fff1d6; --ui-ok:#15803d;
+        --ui-r:14px; --ui-r2:28px; --ui-shadow:0 4px 24px rgba(40,60,100,.07); --ui-hover:rgba(12,14,18,.05); --ui-hover2:rgba(12,14,18,.09); --ui-scroll:#cdd6de; --ui-scrollHover:#b3bec9; }
+      body { font-variant-numeric: tabular-nums; background-color: var(--ui-page); }
+      tbody tr:hover { background: var(--ui-hover); }
+      ::file-selector-button { border: 0; background: var(--ui-sunken); color: var(--ui-strong); border-radius: 999px; padding: 6px 14px; margin-right: 10px; font-weight: 600; cursor: pointer; }
+      select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a8693' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px !important; }
     </style>
-    <script>try{if(localStorage.getItem('archpro.theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
+    <script>try{if(localStorage.getItem('archpro.theme')!=='dark')document.documentElement.setAttribute('data-theme','light')}catch(e){document.documentElement.setAttribute('data-theme','light')}</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"IBM Plex Sans"', 'Segoe UI', 'system-ui', 'sans-serif'],
-              mono: ['"IBM Plex Mono"', 'ui-monospace', 'Consolas', 'monospace'],
+              sans: ['Nunito', 'Segoe UI', 'system-ui', 'sans-serif'],
+              mono: ['Nunito', 'ui-monospace', 'Consolas', 'monospace'],
             },
           },
         },
       }
     </script>
     <style>
-      body { background-color: var(--ui-bg); color: var(--ui-text); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+      body { background-color: var(--ui-page); color: var(--ui-text); font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif; }
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-track { background: var(--ui-bg); }
       ::-webkit-scrollbar-thumb { background: var(--ui-scroll); border-radius: 4px; }

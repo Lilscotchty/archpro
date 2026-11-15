@@ -62,7 +62,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <Stat label="About" value={weeks.toFixed(1)} unit="weeks" />
                     <Stat label="Critical activities" value={`${critical} / ${acts.length}`} tone="warn" />
                   </div>
-                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] p-3 overflow-x-auto">
+                  <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] p-3 overflow-x-auto">
                     <div style={{ minWidth: 560 }}>
                       <div className="flex text-[10px] mb-1" style={{ color: UI.dim, fontFamily: MONO, paddingLeft: 200 }}>
                         <div className="relative flex-1 h-4">
@@ -89,14 +89,14 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                       <span><span style={{ background: UI.accent }} className="inline-block w-2.5 h-2.5 rounded-[var(--ui-r)] mr-1.5 align-middle" />Has float</span>
                     </div>
                   </div>
-                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
+                  <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] overflow-hidden">
                     <table className="w-full text-xs">
-                      <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
+                      <thead style={{ color: UI.dim }} className=""><tr>
                         <th className={`${thCls} w-10`}>#</th><th className={thCls}>Activity</th><th className={`${thCls} text-right`}>Days</th><th className={`${thCls} text-right`}>Start</th><th className={`${thCls} text-right`}>Finish</th><th className={`${thCls} text-right`}>Float</th>
                       </tr></thead>
                       <tbody>
                         {sched.items.map(i => (
-                          <tr key={i.id} style={{ borderColor: UI.rule }} className="border-b last:border-b-0">
+                          <tr key={i.id} className="">
                             <td className={tdCls} style={{ fontFamily: MONO, color: UI.dim }}>{i.id}</td>
                             <td className={tdCls}>{i.name}{i.critical && <span className="ml-2"><Tag tone="warn">critical</Tag></span>}</td>
                             {[i.days, i.es, i.ef, i.float].map((v, k) => <td key={k} className={`${tdCls} text-right`} style={{ fontFamily: MONO }}>{v}</td>)}
@@ -111,7 +111,7 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <Panel>
               <Section title="Activities">
                 {acts.map(a => (
-                  <div key={a.id} style={{ borderColor: UI.rule, background: UI.raised }} className="border rounded-[var(--ui-r)] p-2 space-y-1.5">
+                  <div key={a.id} style={{ background: UI.raised }} className="rounded-[var(--ui-r)] p-2 space-y-1.5">
                     <div className="flex gap-1 items-center">
                       <span className="w-5 text-center text-[11px]" style={{ color: UI.dim, fontFamily: MONO }}>{a.id}</span>
                       <input className={inputCls} value={a.name} onChange={e => patchAct(a.id, { name: e.target.value })} />
@@ -144,21 +144,21 @@ export const MethodStudy: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <Stat label="High / critical" value={String(highRisks)} tone={highRisks ? 'danger' : 'ok'} />
                     <Stat label="Highest score" value={String(Math.max(...risks.map(riskScore)))} unit="/ 25" />
                   </div>
-                  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
+                  <div style={{ background: UI.panel }} className="rounded-[var(--ui-r)] overflow-hidden">
                     <table className="w-full text-xs">
-                      <thead style={{ borderColor: UI.rule, color: UI.dim }} className="border-b"><tr>
+                      <thead style={{ color: UI.dim }} className=""><tr>
                         <th className={thCls}>Hazard</th><th className={`${thCls} w-14 text-right`}>L</th><th className={`${thCls} w-14 text-right`}>S</th><th className={`${thCls} w-24`}>Rating</th><th className={thCls}>Control measures</th><th className="w-8" />
                       </tr></thead>
                       <tbody>
                         {risks.map(r => {
                           const sc = riskScore(r), band = riskBand(sc);
                           return (
-                            <tr key={r.id} style={{ borderColor: UI.rule }} className="border-b last:border-b-0 align-top">
+                            <tr key={r.id} className="align-top">
                               <td className="px-2 py-1.5"><input className={inputCls} value={r.hazard} onChange={e => patchRisk(r.id, { hazard: e.target.value })} /></td>
                               {(['likelihood', 'severity'] as const).map(k => (
                                 <td key={k} className="px-1 py-1.5"><select className={inputCls} value={r[k]} onChange={e => patchRisk(r.id, { [k]: Number(e.target.value) })}>{[1, 2, 3, 4, 5].map(n => <option key={n}>{n}</option>)}</select></td>
                               ))}
-                              <td className={tdCls}><span className="px-1.5 py-0.5 border rounded-[var(--ui-r)]" style={{ color: BAND_COLOR[band], borderColor: BAND_COLOR[band] + '66', fontFamily: MONO }}>{sc} · {band}</span></td>
+                              <td className={tdCls}><span className="px-1.5 py-0.5 rounded-[var(--ui-r)]" style={{ color: BAND_COLOR[band], fontFamily: MONO }}>{sc} · {band}</span></td>
                               <td className="px-2 py-1.5"><input className={inputCls} value={r.control} onChange={e => patchRisk(r.id, { control: e.target.value })} /></td>
                               <td className="px-1 py-1.5"><button title="Remove hazard" onClick={() => setRisks(rs => rs.filter(x => x.id !== r.id))} style={{ color: UI.dim }} className="p-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button></td>
                             </tr>

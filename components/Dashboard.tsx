@@ -1,113 +1,115 @@
-import { ThemeToggle } from './theme';
-import React from 'react';
+// components/Dashboard.tsx — landing page. Soft light surface, light + bold heading, black pill buttons,
+// a floating quick-start bar and no borders: shapes are defined only by fill colour.
+import React, { useState } from 'react';
 import { AppModule } from '../types';
+import { Icon, UI, tint } from './ui';
+import { ThemeToggle, useTheme } from './theme';
 
-interface DashboardProps {
-  onSelectModule: (module: AppModule) => void;
-}
+interface DashboardProps { onSelectModule: (module: AppModule) => void }
+
+const MODULES = [
+  { id: AppModule.DRAWINGS, nav: 'Drawings', title: 'Drawings & Simulation', icon: 'plan', desc: 'AI-assisted structural layouts, foundation generation and auto-drafting.' },
+  { id: AppModule.ELEVATIONS, nav: 'Elevations', title: 'Elevation Studio', icon: 'elevations', desc: 'Upload a plan, pick the walls, windows and doors, and get clean line elevations.' },
+  { id: AppModule.MEASUREMENT, nav: 'Estimate', title: 'Calculation & Measurement', icon: 'measure', desc: 'SMM7 bill of quantities, material take-offs and cost estimation.' },
+  { id: AppModule.METHOD_STUDY, nav: 'Method', title: 'Method Study', icon: 'method', desc: 'Site organisation, safety plans and construction methodology.' },
+  { id: AppModule.PHYSICS, nav: 'Physics', title: 'Building Physics Lab', icon: 'physics', desc: 'Thermal calculations, structural load analysis and environmental impact.' },
+];
+
+/** Flat house illustration (white walls, slate roof, terracotta chimney). */
+const House: React.FC = () => (
+  <svg viewBox="0 0 560 400" className="w-full h-auto" role="img" aria-label="Illustration of a house">
+    <ellipse cx="290" cy="360" rx="250" ry="16" fill="#0c0e12" opacity=".08" />
+    <rect x="70" y="190" width="300" height="165" fill="#ffffff" />
+    <rect x="370" y="210" width="130" height="145" fill="#f1f4f7" />
+    <polygon points="40,200 230,70 420,200 395,214 230,102 65,214" fill="#2b3440" />
+    <polygon points="230,70 420,200 520,215 330,92" fill="#3a4654" />
+    <polygon points="360,215 520,215 500,238 380,238" fill="#2b3440" />
+    <rect x="300" y="48" width="34" height="62" fill="#d9683c" />
+    <rect x="296" y="42" width="42" height="10" fill="#b9532b" />
+    <polygon points="205,118 255,118 230,92" fill="#d9683c" opacity=".9" />
+    <rect x="96" y="226" width="64" height="70" fill="#1f2933" /><rect x="102" y="232" width="52" height="58" fill="#f2a679" />
+    <rect x="190" y="226" width="64" height="70" fill="#1f2933" /><rect x="196" y="232" width="52" height="58" fill="#f2a679" />
+    <rect x="286" y="226" width="64" height="70" fill="#1f2933" /><rect x="292" y="232" width="52" height="58" fill="#f2a679" />
+    <rect x="404" y="262" width="76" height="70" fill="#1f2933" /><rect x="410" y="268" width="64" height="58" fill="#f2a679" />
+    <rect x="200" y="300" width="48" height="55" fill="#1f2933" />
+    <path d="M96 261h58M190 261h58M286 261h58M442 262v70" stroke="#1f2933" strokeWidth="3" />
+    <circle cx="515" cy="345" r="20" fill="#5f8d5a" /><circle cx="540" cy="352" r="16" fill="#6f9d68" /><circle cx="498" cy="354" r="14" fill="#4f7d4b" />
+  </svg>
+);
+
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <label className="flex-1 min-w-[150px] px-4 py-2 rounded-2xl hover:bg-[var(--ui-hover)] transition-colors cursor-pointer">
+    <span className="block text-[11px] font-semibold" style={{ color: UI.dim }}>{label}</span>
+    {children}
+  </label>
+);
+const selCls = 'w-full bg-transparent text-sm font-bold focus:outline-none cursor-pointer pr-6';
 
 export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
-  const modules = [
-    {
-      id: AppModule.DRAWINGS,
-      title: 'Drawings & Simulation',
-      desc: 'AI-assisted structural layouts, foundation generation, and auto-drafting.',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-      ),
-      gradient: 'from-blue-500 to-cyan-400'
-    },
-    {
-      id: AppModule.ELEVATIONS,
-      title: 'Elevation Studio',
-      desc: 'Upload a plan (image or PDF), pick the external walls, windows and doors, and get front, rear and side elevations as clean black-and-white line drawings.',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6M7 13h.01M17 13h.01" /></svg>
-      ),
-      gradient: 'from-rose-500 to-orange-400'
-    },
-    {
-      id: AppModule.MEASUREMENT,
-      title: 'Calculation & Measurement',
-      desc: 'SMM7 Bill of Quantities, material take-offs, and cost estimation.',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-      ),
-      gradient: 'from-emerald-500 to-teal-400'
-    },
-    {
-      id: AppModule.METHOD_STUDY,
-      title: 'Method Study',
-      desc: 'Site organization, safety plans, and construction methodology.',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-      ),
-      gradient: 'from-purple-500 to-pink-400'
-    },
-    {
-      id: AppModule.PHYSICS,
-      title: 'Building Physics Lab',
-      desc: 'Thermal calculations, structural load analysis, and environmental impact.',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-      ),
-      gradient: 'from-amber-500 to-orange-400'
-    }
-  ];
+  const [pick, setPick] = useState<string>(String(AppModule.MEASUREMENT));
+  const [theme, setTheme] = useTheme();
+  const go = (id: string) => { const m = MODULES.find(x => String(x.id) === id); if (m) onSelectModule(m.id); };
 
   return (
-    <div className="legacy-dash flex flex-col items-center justify-center min-h-screen p-8 relative z-10">
-      <div className="absolute top-4 right-4 z-20"><ThemeToggle /></div>
-      {/* Styles scoped to the dashboard only, so other pages keep the unified studio look */}
-      <style>{`
-        .legacy-dash { background-color: var(--ui-bg); color: var(--ui-text); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
-        .legacy-dash .glass-panel { background: var(--ui-panel); border: 1px solid var(--ui-rule); box-shadow: var(--ui-shadow); }
-        .legacy-dash .glass-panel:hover { background: var(--ui-hover); }
-      `}</style>
-      
-      {/* HEADER SECTION */}
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-semibold mb-2 tracking-tight" style={{ color: 'var(--ui-strong)' }}>
-          Construct<span style={{ color: 'var(--ui-accent)' }}>OS</span>
-        </h1>
-        <p className="text-base max-w-xl mx-auto" style={{ color: 'var(--ui-dim)' }}>
-          The Spatial Engineering Platform.
-        </p>
-      </div>
+    <div className="min-h-screen w-full p-2 sm:p-6" style={{ background: UI.page, color: UI.text, fontFamily: 'Nunito, "Segoe UI", system-ui, sans-serif' }}>
+      <div className="mx-auto max-w-6xl overflow-hidden" style={{ background: UI.bg, borderRadius: 'var(--ui-r2)', boxShadow: 'var(--ui-shadow)' }}>
+        {/* top bar */}
+        <header className="flex items-center gap-6 px-6 sm:px-10 py-6">
+          <span className="text-xl font-extrabold tracking-tight" style={{ color: UI.strong }}>ArchPro</span>
+          <div className="flex-1" />
+          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold">
+            {MODULES.map(m => <button key={m.id} onClick={() => onSelectModule(m.id)} className="hover:opacity-100 opacity-70 transition-opacity" style={{ color: UI.strong }}>{m.nav}</button>)}
+          </nav>
+          <ThemeToggle />
+          <button onClick={() => onSelectModule(AppModule.MEASUREMENT)} className="px-6 py-2.5 rounded-full text-xs font-bold" style={{ background: UI.accent, color: UI.accentInk }}>Start estimate</button>
+        </header>
 
-      {/* CARDS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl w-full">
-        {modules.map((mod, idx) => (
-          <button
-            key={mod.id}
-            onClick={() => onSelectModule(mod.id)}
-            className="glass-panel group rounded-xl p-6 text-left relative flex items-start transition-colors duration-150"
-          >
-            
-            <div className="flex items-start gap-5 relative z-10">
-              <div className="p-3 rounded-[var(--ui-r)] shrink-0" style={{ background: 'color-mix(in srgb, var(--ui-accent) 12%, transparent)', color: 'var(--ui-accent)' }}>
-                {mod.icon}
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-1" style={{ color: 'var(--ui-strong)' }}>
-                  {mod.title}
-                </h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--ui-dim)' }}>
-                  {mod.desc}
-                </p>
-              </div>
+        {/* hero */}
+        <section className="relative grid md:grid-cols-2 items-center gap-6 px-6 sm:px-10 pt-6 pb-28">
+          <div>
+            <h1 className="text-5xl sm:text-6xl leading-[1.08] tracking-tight" style={{ color: UI.strong }}>
+              <span className="font-light">Gateway to</span><br /><span className="font-extrabold">Better Estimates</span>
+            </h1>
+            <p className="mt-6 text-xs max-w-xs leading-relaxed" style={{ color: UI.dim }}>Draw a plan, read a drawing, and build a priced bill of quantities in one place, simplified and organised step by step.</p>
+            <div className="mt-8 flex items-center gap-5">
+              <button onClick={() => onSelectModule(AppModule.MEASUREMENT)} className="px-7 py-3 rounded-full text-xs font-bold" style={{ background: UI.accent, color: UI.accentInk }}>Discover Now</button>
+              <button onClick={() => onSelectModule(AppModule.DRAWINGS)} className="flex items-center gap-3 text-xs font-bold" style={{ color: UI.strong }}>
+                <span className="w-11 h-11 rounded-full grid place-items-center" style={{ background: UI.field }}><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg></span>
+                Open Drafting
+              </button>
             </div>
+          </div>
+          <div className="md:-mr-6"><House /></div>
 
-            {/* ACTION ARROW */}
-            <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-               <svg className="w-5 h-5" style={{ color: 'var(--ui-accent)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-            </div>
-          </button>
-        ))}
-      </div>
-      
-      <div className="mt-16 text-xs" style={{ color: 'var(--ui-dim)' }}>
-        v2.6.0 Stable / SMM7 Engine
+          {/* floating quick-start bar */}
+          <div className="absolute left-6 right-6 sm:left-10 sm:right-10 bottom-6 flex flex-wrap items-center gap-2 p-3 rounded-3xl" style={{ background: UI.panel, boxShadow: 'var(--ui-shadow)' }}>
+            <Field label="Module">
+              <select className={selCls} style={{ color: UI.strong }} value={pick} onChange={e => setPick(e.target.value)}>
+                {MODULES.map(m => <option key={m.id} value={String(m.id)}>{m.title}</option>)}
+              </select>
+            </Field>
+            <Field label="Appearance">
+              <select className={selCls} style={{ color: UI.strong }} value={theme} onChange={e => setTheme(e.target.value as 'light' | 'dark')}>
+                <option value="light">Light</option><option value="dark">Dark</option>
+              </select>
+            </Field>
+            <button onClick={() => go(pick)} aria-label="Open module" className="w-12 h-12 rounded-full grid place-items-center shrink-0 ml-auto" style={{ background: UI.accent, color: UI.accentInk }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </button>
+          </div>
+        </section>
+
+        {/* modules */}
+        <section className="px-6 sm:px-10 pb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {MODULES.map(m => (
+            <button key={m.id} onClick={() => onSelectModule(m.id)} className="text-left p-5 rounded-3xl transition-transform hover:-translate-y-0.5" style={{ background: UI.panel, boxShadow: 'var(--ui-shadow)' }}>
+              <span className="w-10 h-10 rounded-full grid place-items-center" style={{ background: UI.field, color: UI.strong }}><Icon n={m.icon} s={18} /></span>
+              <div className="mt-4 text-sm font-extrabold" style={{ color: UI.strong }}>{m.title}</div>
+              <div className="mt-1 text-[11px] leading-relaxed" style={{ color: UI.dim }}>{m.desc}</div>
+            </button>
+          ))}
+        </section>
+        <div className="pb-6 text-center text-[11px]" style={{ color: tint(UI.dim, 90) }}>v2.6.0 · SMM7 engine</div>
       </div>
     </div>
   );
