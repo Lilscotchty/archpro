@@ -1,4 +1,4 @@
-// utils/boq/rasterize.ts — turn a plan file (image or PDF page) into a JPEG small enough for the Groq vision API
+// utils/boq/rasterize.ts — turn a plan file (image or PDF page) into a JPEG small enough for a vision API
 // (base64 images are limited to about 4 MB).
 
 import { loadPlanFile } from '../elevation/planLoader';

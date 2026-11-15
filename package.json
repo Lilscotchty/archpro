@@ -17,7 +17,8 @@
     "playcanvas": "^2.24.1",
     "qrcode.react": "^4.0.1",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react-dom": "^19.2.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
