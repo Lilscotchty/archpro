@@ -73,6 +73,22 @@ npx tsx scripts/drawings-selftest.ts   # generated drawings
 npm i --no-save fake-indexeddb && npx tsx scripts/store-selftest.ts   # local drawing store
 ```
 
+## Drafting studio
+
+Model space is **real millimetres**, so quantities, 3D and drawings downstream are always true to scale.
+
+- **Blank sheet** or **trace over a drawing** (PNG, JPG or a PDF page). A traced drawing is an underlay with its own scale.
+- **Setting the scale:** pick two points on a known dimension, or give the printed scale (1:N) for a PDF page (exact, from its page size) or an image on a named paper size / known dpi. Use **Measure** to verify. **Straighten** levels a skewed scan.
+- **Drawing:** walls with real thickness and clean joints, room outlines (four joined walls), doors and windows that cut through the wall they sit on, structural grid lines. Typed entry: `4500`, `4500<90`, `3000,2000` (mm, or add `m`).
+- **Precision:** endpoint, midpoint, intersection and on-wall snaps, polar and alignment tracking, ortho, adaptive grid, rulers and a scale bar.
+- **Editing:** box select, move (joined walls stretch, doors travel with their wall), drag grips, edit lengths and coordinates numerically, undo / redo.
+- **Reliability:** autosave to IndexedDB, plan files (`.json`, Ctrl+S), resume last session.
+- **Foundation plan sheet** is drawn at a standard scale (1:50, 1:100...) with scale bar, dimensions and title block.
+
+Shortcuts: V select, H pan, W wall, R room outline, D door, N window, G grid line, M measure, S set scale, A straighten, F fit, F3 snap, F8 ortho, F9 grid, F10 tracking, Ctrl+Z / Ctrl+Y undo / redo.
+
+Tests: `npm run test:drafting`.
+
 ## Run
 
 ```bash
