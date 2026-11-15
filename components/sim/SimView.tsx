@@ -45,6 +45,7 @@ export const SimView: React.FC<SimViewProps> = props => {
   const nodes = useRef<Node[]>([]);
   const mats = useRef<{ base: Map<MatKey, StandardMaterial>; sel: Map<MatKey, StandardMaterial> }>({ base: new Map(), sel: new Map() });
   const latest = useRef(props); latest.current = props;
+  const framed = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -183,7 +184,8 @@ export const SimView: React.FC<SimViewProps> = props => {
     const ext = Math.max(model.max[0] - model.min[0], model.max[2] - model.min[2], model.max[1] - model.min[1], 6);
     if (sunRef.current?.light) sunRef.current.light.shadowDistance = ext * 3;
     refreshState();
-    frame();
+    // frame the camera once, when the model first has real geometry; later edits keep the view where the user left it
+    if (!framed.current && model.stats.tris > 0) { framed.current = true; frame(); }
   }, [ready, props.model]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------- state that does not need a rebuild
