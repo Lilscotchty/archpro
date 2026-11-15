@@ -10,6 +10,15 @@
       tailwind.config = {
         theme: {
           extend: {
+            fontSize: {
+              xs: ['0.875rem', { lineHeight: '1.3rem' }],     // 14px (was 12px)
+              sm: ['0.96875rem', { lineHeight: '1.45rem' }],  // 15.5px (was 14px)
+              base: ['1.0625rem', { lineHeight: '1.6rem' }],  // 17px
+              lg: ['1.1875rem', { lineHeight: '1.75rem' }],
+              xl: ['1.375rem', { lineHeight: '1.9rem' }],
+              '2xl': ['1.625rem', { lineHeight: '2.1rem' }],
+              '3xl': ['2rem', { lineHeight: '2.4rem' }],
+            },
             fontFamily: {
               sans: ['"IBM Plex Sans"', 'Segoe UI', 'system-ui', 'sans-serif'],
               mono: ['"IBM Plex Mono"', 'ui-monospace', 'Consolas', 'monospace'],
@@ -19,11 +28,27 @@
       }
     </script>
     <style>
-      body { background-color: #15171a; color: #c9cfd6; font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: #15171a; }
-      ::-webkit-scrollbar-thumb { background: #2e333a; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #3b424b; }
+      :root { --bg:#0d0f12; --panel:#171a1f; --raised:#1d2127; --rule:#2a3038; --text:#d6dbe2; --dim:#8a94a2; --accent:#5aaeff; --accent2:#7c8cff; }
+      html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+      body { background: radial-gradient(1200px 600px at 12% -10%, rgba(90,174,255,.10), transparent 60%), radial-gradient(900px 500px at 100% 0%, rgba(124,140,255,.08), transparent 55%), #0d0f12; background-attachment: fixed; color: var(--text); font-family: 'IBM Plex Sans','Segoe UI',system-ui,sans-serif; font-size: 16px; }
+      ::selection { background: rgba(90,174,255,.35); }
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #2a3038; border-radius: 6px; border: 2px solid #0d0f12; }
+      ::-webkit-scrollbar-thumb:hover { background: #3a424d; }
+      /* readable type: the arbitrary tiny sizes used around the app get a floor, and the 13px studio root grows */
+      .text-\[10px\] { font-size: 12.5px !important; }
+      .text-\[11px\] { font-size: 13.5px !important; }
+      [style*="font-size: 13px"] { font-size: 15px !important; }
+      /* feel: smooth, tactile, accessible */
+      button, a, select, input { transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .12s ease, filter .15s ease; }
+      button:not(:disabled):active { transform: translateY(1px) scale(.99); }
+      button { cursor: pointer; }
+      button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+      input:focus, select:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(90,174,255,.18); }
+      @keyframes aurora { 0% { transform: translate3d(-4%,-2%,0) scale(1); } 50% { transform: translate3d(4%,3%,0) scale(1.12); } 100% { transform: translate3d(-4%,-2%,0) scale(1); } }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
     </style>
   </head>
   <body>
