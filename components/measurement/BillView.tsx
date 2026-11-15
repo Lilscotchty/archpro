@@ -21,13 +21,22 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
   });
   const total = s.summary.sections;
   if (total.length === 0 && s.customs.length === 0)
-    return <Empty icon="measure" title="Nothing to measure yet" hint="Draw walls in the Drafting Studio, or add walls on the Schedule tab, or read a drawing on the AI tab. The bill builds itself as you go." />;
+    return <Empty icon="measure" title="Nothing to measure yet" hint="Add the building size in the Project step, then read a drawing or add walls in the Quantities step. The bill builds itself as you go." />;
 
   return (
-    <div className="max-w-6xl mx-auto grid gap-4">
-      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.danger, 24), background: tint(UI.danger, 6), color: UI.danger }}>{w}</div> : null; })()}
-      {(s.model.walls.some(w => w.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) && <div className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>Quantities include values the AI read from the drawing. Check the Schedule tab against the drawing, then confirm the Setup assumptions (foundation depth, roof, finishes) that the drawing does not show.</div>}
-      {s.built.geo.warnings.map((w, i) => <div key={i} className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>{w}</div>)}
+    <div className="max-w-5xl mx-auto grid gap-4">
+      {(() => {
+        const items: { tone: 'danger' | 'warn'; text: string }[] = [];
+        const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); if (w) items.push({ tone: 'danger', text: w });
+        if (s.model.walls.some(x => x.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) items.push({ tone: 'warn', text: 'Some quantities were read by the AI. Check them against the drawing in the Quantities step.' });
+        s.built.geo.warnings.forEach(x => items.push({ tone: 'warn', text: x }));
+        if (!items.length) return null;
+        const c = items.some(i => i.tone === 'danger') ? UI.danger : UI.warn;
+        return <div className="text-xs border rounded-[var(--ui-r)] p-3" style={{ borderColor: tint(c, 24), background: tint(c, 6) }}>
+          <div className="font-semibold mb-1" style={{ color: c }}>Check before you use this total ({items.length})</div>
+          <ul className="space-y-1" style={{ color: UI.text }}>{items.map((i, k) => <li key={k} className="flex gap-2"><span style={{ color: i.tone === 'danger' ? UI.danger : UI.warn }}>•</span><span>{i.text}</span></li>)}</ul>
+        </div>;
+      })()}
       {total.map(sec => (
         <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: UI.rule, background: UI.raised }}>

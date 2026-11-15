@@ -25,7 +25,7 @@ export const RatesView: React.FC<{ s: BoqState }> = ({ s }) => {
   };
   const keys = Object.keys(s.rates).filter(k => (k + s.rates[k].label).toLowerCase().includes(q.toLowerCase())).sort();
   return (
-    <div className="max-w-4xl mx-auto grid gap-3">
+    <div className="max-w-5xl mx-auto grid gap-3">
       <div className="border rounded-[var(--ui-r)] p-3 text-xs" style={{ borderColor: tint(UI.warn, 24), background: tint(UI.warn, 6), color: UI.warn }}>
         Rates with no date are placeholders so the bill is not blank. They are not a price list. {placeholders} of {Object.keys(s.rates).length} rates are still placeholders. Type your own, or import a CSV of your supplier and subcontractor prices (Export first to get the layout: key, item, unit, rate, source, updated). Rates you enter are dated and marked as yours.
       </div>

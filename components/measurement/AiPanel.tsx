@@ -107,15 +107,15 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; onEstimate?
     if (!result) return;
     const out = applyExtraction(result, s.model, s.assumptions, mode);
     s.setModel(out.model); s.setAssumptions(out.assumptions);
-    setApplied(`Applied: ${out.summary.join(', ') || 'nothing usable was found'}. Review it on the Schedule tab before relying on the bill.`);
+    setApplied(`Applied: ${out.summary.join(', ') || 'nothing usable was found'}. Review it in the Quantities step before relying on the bill.`);
     onApplied();
   };
 
   return (
-    <div className="max-w-4xl mx-auto grid gap-3">
+    <div className="max-w-5xl mx-auto grid gap-3">
       <div className="border rounded-[var(--ui-r)] p-3 text-xs" style={{ borderColor: UI.rule, background: UI.raised, color: UI.dim }}>
         The AI <b style={{ color: UI.text }}>reads</b> printed dimensions, door and window schedules, room labels and notes from the drawing. It does not measure by scale and it can misread. Everything it returns is checked,
-        shown here for review, and only enters the bill when you apply it. Check the Schedule tab afterwards. Your key stays in this browser. Gemini route: pages go to Google. Text route: only the extracted text goes to Groq.
+        shown here for review, and only enters the bill when you apply it. Check the Quantities step afterwards. Your key stays in this browser. Gemini route: pages go to Google. Text route: only the extracted text goes to Groq.
       </div>
       <Card title="AI connection (free options)">
         <Lbl label="How should the drawing be read?" hint={provider === 'gemini' ? 'Sends the page image to Google Gemini. Free tier, no card needed. Free-tier content may be used by Google, so avoid confidential drawings.' : 'No image is sent. Text is pulled from the PDF (or OCR in your browser for scans) and a free Groq text model turns it into the schedule. Best for PDFs from CAD or the Drafting Studio.'}>

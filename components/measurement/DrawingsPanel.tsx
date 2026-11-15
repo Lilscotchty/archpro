@@ -61,7 +61,7 @@ export const DrawingsPanel: React.FC<Props> = ({ auto, setAuto, running, skipped
   };
 
   return (
-    <div className="max-w-6xl mx-auto grid gap-3">
+    <div className="max-w-5xl mx-auto grid gap-3">
       <div className="border rounded-[var(--ui-r)] p-3 text-xs flex items-start gap-3 flex-wrap" style={{ borderColor: st.backend === 'cloud' ? tint(UI.ok, 53) : tint(UI.warn, 53), background: UI.raised }}>
         <div className="flex-1 min-w-[260px]">
           <div className="font-semibold" style={{ color: 'var(--ui-strong)' }}>

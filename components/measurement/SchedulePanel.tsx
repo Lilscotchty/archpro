@@ -33,7 +33,7 @@ export const SchedulePanel: React.FC<{ s: BoqState; hasPlan: boolean }> = ({ s, 
       <div className="flex items-center gap-2 flex-wrap">
         <button className={btnPrimary} onClick={s.importFromPlan} disabled={!hasPlan}>Import from Drafting Studio</button>
         <span className="text-[11px]" style={{ color: UI.dim }}>
-          {hasPlan ? 'Replaces rows marked plan; rows you added or the AI added are kept.' : 'No walls drawn in the Drafting Studio yet. Draw a plan there, or add rows here, or read a drawing on the AI tab.'}
+          {hasPlan ? 'Replaces rows marked plan; rows you added or the AI added are kept.' : 'No walls drawn in the Drafting Studio yet. Draw a plan there, or add rows here, or read a drawing in the Drawing step.'}
         </span>
         <span className="flex-1" />
         <span className="text-[11px]" style={{ color: UI.dim, fontFamily: 'ui-monospace, monospace' }}>external {extLen.toFixed(2)} m · internal {intLen.toFixed(2)} m</span>

@@ -1,7 +1,7 @@
 // utils/boq/ai.ts
 // Reads architectural drawings with a Groq vision model and turns the answer into schedule rows.
 // The model only READS what is printed on the drawing. Nothing it returns reaches the bill until the
-// user has reviewed it on the Schedule tab, and every value is sanity-checked first.
+// user has reviewed it in the Quantities step, and every value is sanity-checked first.
 
 import { Assumptions, BoqModel, CeilingType, ColumnRow, FloorFinish, OpeningRow, RoofCovering, RoofType, WallRow } from './types';
 

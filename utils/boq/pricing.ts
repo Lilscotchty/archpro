@@ -52,5 +52,5 @@ export function placeholderStats(lines: PricedLine[], rates: RateLibrary, ov: Re
   return { count: ph.length, of: live.length, amount: r2(amount), share: all > 0 ? amount / all : 0 };
 }
 export function rateWarning(st: ReturnType<typeof placeholderStats>): string {
-  return st.count === 0 ? '' : `${st.count} of ${st.of} priced items (${Math.round(st.share * 100)}% of the net works) still use placeholder rates that are not real prices. Enter your own rates on the Rates tab (or import a CSV) before using this total.`;
+  return st.count === 0 ? '' : `${st.count} of ${st.of} priced items (${Math.round(st.share * 100)}% of the net works) still use placeholder rates that are not real prices. Enter your own rates in the Rates step (or import a CSV) before using this total.`;
 }

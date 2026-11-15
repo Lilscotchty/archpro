@@ -20,7 +20,7 @@ export const SummaryView: React.FC<{ s: BoqState }> = ({ s }) => {
     <span className="inline-flex items-center gap-2">{label}<NumInput className={inputCls + ' w-16 text-right'} value={mk[k]} onChange={n => set({ [k]: n } as Partial<typeof mk>)} />%</span>
   );
   return (
-    <div className="max-w-4xl mx-auto grid gap-4">
+    <div className="max-w-5xl mx-auto grid gap-4">
       {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[var(--ui-r)] p-2" style={{ borderColor: tint(UI.danger, 24), background: tint(UI.danger, 6), color: UI.danger }}>{w}</div> : null; })()}
       <div className="grid grid-cols-3 gap-3">
         {[['Net measured works', m.net], ['Tender total', m.grand], [`Per m2 of floor area`, m.perM2]].map(([l, v]) => (

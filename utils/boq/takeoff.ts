@@ -40,8 +40,8 @@ export function computeGeometry(model: BoqModel, a: Assumptions): Geometry {
   const L = Math.max(model.footprint.lengthM, model.footprint.widthM) + t;
   const B = Math.min(model.footprint.lengthM, model.footprint.widthM) + t;
 
-  if (ext.length === 0) warnings.push('No external walls: add or import walls, or enter them on the Schedule tab.');
-  if (aC <= 0) warnings.push('Footprint area is zero: set the footprint length, width and area on the Setup tab.');
+  if (ext.length === 0) warnings.push('No external walls: add or import walls, or enter them in the Quantities step.');
+  if (aC <= 0) warnings.push('Footprint area is zero: set the footprint length, width and area in the Project step.');
   const rectArea = model.footprint.lengthM * model.footprint.widthM;
   if (aC > 0 && rectArea > 0 && aC > rectArea * 1.02) warnings.push('Footprint area is larger than length x width: check the footprint figures.');
   if (extLen > 0 && aC > 0 && 2 * (model.footprint.lengthM + model.footprint.widthM) > 0
@@ -345,19 +345,19 @@ export function buildBoq(model: BoqModel, a: Assumptions): { lines: BoqLine[]; g
     ['ps.plumbing', 'Provisional sum; plumbing and sanitary installation (water supply, fittings, sanitary ware)'],
     ['ps.drainage', 'Provisional sum; drainage below ground, manholes and septic tank / soakaway'],
     ['ps.external', 'Provisional sum; external works (paving, fencing, landscaping)']] as const)
-    .forEach(([k, d]) => add('PS', k, d, 1, 'item', k, `allowance per m2 of GFA (${f(gfa)} m2) from the Rates tab`, 'ps', gfa));
+    .forEach(([k, d]) => add('PS', k, d, 1, 'item', k, `allowance per m2 of GFA (${f(gfa)} m2) from the Rates step`, 'ps', gfa));
 
   return { lines, geo };
 }
 
 export function scopeNotes(a: Assumptions): string[] {
   return [
-    'Quantities are net, taken from the plan data and assumptions on the Setup and Schedule tabs. No allowance is made for waste, bulking, shrinkage or laps.',
+    'Quantities are net, taken from the plan data and assumptions in the Project and Quantities steps. No allowance is made for waste, bulking, shrinkage or laps.',
     'Items marked "approx" (reinforcement, roof carcass, skirting, anti-termite, staircase) rest on stated assumptions and should be replaced by measured quantities from the structural and detail drawings.',
     `Openings over ${a.openingDeductM2.toFixed(2)} m2 are deducted from walling and finishes; smaller openings are not deducted.`,
     'Doors and windows are rated complete (frame, leaf, glazing, ironmongery and finish). Reveals, sills and builder\'s work in connection with services are not measured separately.',
     'Electrical, plumbing, drainage and external works are provisional sums derived from gross floor area. Replace them with specialist quotations.',
-    'Rates are placeholders until you replace them on the Rates tab. Preliminaries, overheads, contingency and taxes are percentages entered on the Summary tab.',
+    'Rates are placeholders until you replace them in the Rates step. Preliminaries, overheads, contingency and taxes are percentages entered on the Summary page of the Estimate step.',
     'Section codes follow SMM7 work sections. Check item descriptions and measurement rules against the SMM7 classification tables before issuing tender documents.',
   ];
 }

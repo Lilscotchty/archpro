@@ -1,7 +1,7 @@
 // components/measurement/useAutoDrawings.ts
 // While the Measurement module is open, the drawings the take-off needs (floor plan, foundation plan, elevations) are
 // generated in the background from the Drafting Studio plan and stored under their designated ids. They are listed on the
-// Drawings tab, where they can be viewed and downloaded. Switch the toggle off to stop automatic generation.
+// Drawing step, where they can be viewed and downloaded. Switch the toggle off to stop automatic generation.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProjectState } from '../../types';
