@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import { BoqState } from './useBoqState';
 import { Card, Check, Lbl, Select, TextInput } from './fields';
 import { Empty, Tag, UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
-import { AiExtraction, DEFAULT_GROQ_MODEL, analyseDrawing, applyExtraction, listGroqModels, mergeExtractions } from '../../utils/boq/ai';
+import { AiExtraction, DEFAULT_GROQ_MODEL, resolveModel, analyseDrawing, applyExtraction, listGroqModels, mergeExtractions, testVision } from '../../utils/boq/ai';
 import { rasterizeForAi } from '../../utils/boq/rasterize';
 import { DrawingMeta } from '../../utils/drawings/types';
 import { getDrawingBlob, listDrawings, subscribe } from '../../utils/drawings/store';
@@ -16,7 +16,7 @@ const MAX_PAGES = 4;
 export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDrawing?: DrawingMeta | null }> = ({ s, onApplied, initialDrawing }) => {
   const [key, setKey] = useState(lsGet(K_KEY));
   const [remember, setRemember] = useState(!!lsGet(K_KEY));
-  const [model, setModel] = useState(lsGet(K_MODEL) || DEFAULT_GROQ_MODEL);
+  const [model, setModel] = useState(resolveModel(lsGet(K_MODEL)));
   const [models, setModels] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [from, setFrom] = useState(1);
@@ -29,6 +29,7 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
   const [raw, setRaw] = useState<string[]>([]);
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [applied, setApplied] = useState('');
+  const [usedModel, setUsedModel] = useState('');
   const abort = useRef<AbortController | null>(null);
   const [stored, setStored] = useState<DrawingMeta[]>([]);
   const [storedId, setStoredId] = useState('');
@@ -46,8 +47,15 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
 
   const loadModels = async () => {
     setError('');
-    try { const l = await listGroqModels(key.trim()); setModels(l); if (!l.includes(model)) setError('The selected model is not in your Groq model list. Pick a vision-capable model (Llama 4 Scout or Maverick, if listed).'); }
+    try { const l = await listGroqModels(key.trim()); setModels(l); if (!l.includes(model)) setError('The selected model is not in your Groq model list. Pick a vision-capable model (qwen/qwen3.6-27b is the current one).'); }
     catch (e) { setError((e as Error).message); }
+  };
+
+  const [test, setTest] = useState('');
+  const runTest = async () => {
+    setTest('Testing with your key…'); setError('');
+    try { const r = await testVision(key.trim(), model); setTest((r.ok ? 'OK: ' : 'Failed: ') + r.message); if (r.ok && r.modelUsed !== model) saveModel(r.modelUsed); }
+    catch (e) { setTest('Failed: ' + (e as Error).message); }
   };
 
   const run = async () => {
@@ -65,8 +73,9 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
         if (p > img.numPages) break;
         imgs.push(img.dataUrl); setThumbs([...imgs]);
         setProgress(`Reading page ${p} of ${last}…`);
-        const { extraction, raw: r } = await analyseDrawing({ apiKey: key.trim(), model, imageDataUrl: img.dataUrl, hint, signal: ctl.signal });
+        const { extraction, raw: r, modelUsed } = await analyseDrawing({ apiKey: key.trim(), model, imageDataUrl: img.dataUrl, hint, signal: ctl.signal });
         results.push(extraction); raws.push(r);
+        if (modelUsed !== model) { setUsedModel(modelUsed); saveModel(modelUsed); }
       }
       setResult(mergeExtractions(results)); setRaw(raws);
     } catch (e) {
@@ -91,11 +100,15 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
       </div>
       <Card title="Groq connection">
         <Lbl label="API key"><TextInput type="password" value={key} onChange={v => saveKey(v)} placeholder="gsk_…" /></Lbl>
-        <Lbl label="Model" hint="Needs a vision model. Use Check key to list what your account offers.">
+        <Lbl label="Model" hint="Needs a vision model (images). Default: qwen/qwen3.6-27b. Retired Llama 4 models are switched automatically.">
           {models.length ? <Select value={model} onChange={saveModel} options={models.map(m => [m, m] as [string, string])} /> : <TextInput value={model} onChange={saveModel} />}
         </Lbl>
         <Check checked={remember} onChange={r => { setRemember(r); lsSet(K_KEY, r ? key : ''); }} label="Remember the key on this device" />
-        <div><button className={btnGhost} onClick={loadModels} disabled={!key.trim()}>Check key and list models</button></div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className={btnGhost} onClick={loadModels} disabled={!key.trim()}>Check key and list models</button>
+          <button className={btnGhost} onClick={runTest} disabled={!key.trim()}>Test image reading</button>
+          <span className="text-xs" style={{ color: test.startsWith('OK') ? UI.ok : UI.dim }}>{test}</span>
+        </div>
       </Card>
       <Card title="Drawing">
         <Lbl label="Stored drawing (by designated id)" hint="Drawings from the Drafting Studio, Elevation Studio, auto-generated and uploaded ones.">
