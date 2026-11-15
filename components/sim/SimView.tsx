@@ -61,7 +61,7 @@ export const SimView: React.FC<SimViewProps> = props => {
     }
     appRef.current = app;
     app.setCanvasFillMode(FILLMODE_NONE);
-    app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    app.graphicsDevice.maxPixelRatio = 3;
     app.scene.ambientLight = new Color(0.4, 0.41, 0.45);
 
     const camera = new Entity('Camera');
@@ -78,12 +78,23 @@ export const SimView: React.FC<SimViewProps> = props => {
     const sun = new Entity('Sun');
     sun.addComponent('light', {
       type: 'directional', color: new Color(1, 0.96, 0.9), intensity: 1.15, castShadows: true,
-      shadowType: SHADOW_PCF3_32F, shadowResolution: 2048, shadowDistance: 80, normalOffsetBias: 0.04, shadowBias: 0.15,
+      shadowType: SHADOW_PCF3_32F, shadowResolution: 4096, shadowDistance: 80, normalOffsetBias: 0.04, shadowBias: 0.15,
     });
     app.root.addChild(sun);
     sunRef.current = sun;
 
-    const resize = () => { const r = wrap.getBoundingClientRect(); if (r.width > 0 && r.height > 0) app.resizeCanvas(Math.floor(r.width), Math.floor(r.height)); };
+    // Render at 2x (or the screen's own ratio if higher, up to 3x) and let the browser scale down: supersampling removes the
+    // soft, jagged look on standard-density screens, where PlayCanvas would otherwise render 1 pixel per CSS pixel.
+    const resize = () => {
+      const r = wrap.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) return;
+      const w = Math.floor(r.width), h = Math.floor(r.height);
+      app.resizeCanvas(w, h);
+      const ratio = Math.min(3, Math.max(window.devicePixelRatio || 1, 2));
+      const W = Math.floor(w * ratio), H = Math.floor(h * ratio), dev = app.graphicsDevice;
+      if (dev.canvas.width !== W || dev.canvas.height !== H) dev.setResolution(W, H);
+      canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+    };
     const ro = new ResizeObserver(resize); ro.observe(wrap); resize();
 
     // simple 1 m ground grid drawn every frame
