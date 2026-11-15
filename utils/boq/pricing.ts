@@ -43,3 +43,14 @@ export function summarize(lines: PricedLine[], mk: Markups, gfaM2: number): Summ
   const grand = r2(subtotal + tax);
   return { sections, net, prelims, ohp, contingency, subtotal, tax, grand, perM2: gfaM2 > 0 ? r2(grand / gfaM2) : 0 };
 }
+
+/** Lines still priced with an unsourced placeholder rate (no dated rate in the library and no rate typed on the line). */
+export function placeholderStats(lines: PricedLine[], rates: RateLibrary, ov: Record<string, LineOverride>) {
+  const live = lines.filter(l => !l.custom && !l.omitted && l.amount > 0);
+  const ph = live.filter(l => ov[l.key]?.rate === undefined && !rates[l.rateKey]?.updated);
+  const amount = ph.reduce((x, l) => x + l.amount, 0), all = live.reduce((x, l) => x + l.amount, 0);
+  return { count: ph.length, of: live.length, amount: r2(amount), share: all > 0 ? amount / all : 0 };
+}
+export function rateWarning(st: ReturnType<typeof placeholderStats>): string {
+  return st.count === 0 ? '' : `${st.count} of ${st.of} priced items (${Math.round(st.share * 100)}% of the net works) still use placeholder rates that are not real prices. Enter your own rates in the Rates step (or import a CSV) before using this total.`;
+}

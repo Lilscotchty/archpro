@@ -2,7 +2,8 @@
 // Pure TypeScript: no engine or DOM dependency, so it can be unit-tested and exported to glTF directly.
 
 import { DEFAULT_SIM, MatKey, PartKind, PlanEl, SimModel, SimPart, SimSettings } from './types';
-import { WallSeg, expandWalls, hostWall, roomTriangles } from './plan';
+import { WallSeg, expandWalls, hostWall, roomTriangles, triangulate } from './plan';
+import { buildHipRoof } from '../elevation/hip';
 
 type V3 = [number, number, number];
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -201,7 +202,31 @@ export function buildModel(els: PlanEl[], cfg: Partial<SimSettings> = {}): SimMo
     const W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const eaveY = yTop - tp * o;
     const rt = S.roof.type;
-    if (rt === 'gable' || rt === 'hip') {
+    // True hip roof for any simple outline: every roof plane has the same pitch, so hips and valleys follow the
+    // 45-degree corner bisectors (straight skeleton, shared with the Elevation Studio). Falls back to a plain
+    // rectangular hip when the outline is not one closed loop.
+    let hipDone = false;
+    if (rt === 'hip') {
+      const mmWalls = walls.map(w => ({ a: { x: w.x1 * S.mmPerUnit, y: -w.y1 * S.mmPerUnit }, b: { x: w.x2 * S.mmPerUnit, y: -w.y2 * S.mmPerUnit } }));
+      const hip = buildHipRoof(mmWalls, Math.max(250, S.wallThicknessMm), S.roof.overhangMm);
+      if (hip) {
+        const roofB = new Buf();
+        const world = (p: { x: number; y: number }, y: number): V3 => [p.x / 1000, y, -p.y / 1000];
+        const signed = (poly: { x: number; y: number }[]) => poly.reduce((a, p, i) => { const q = poly[(i + 1) % poly.length]; return a + (p.x * q.y - q.x * p.y); }, 0) / 2;
+        const ccw = <T extends { x: number; y: number }>(poly: T[]) => (signed(poly) < 0 ? poly.slice().reverse() : poly);
+        for (const f of hip.faces) {
+          const d: V3 = [f.out.x, 0, -f.out.y], n = norm([d[0] * tp, 1, d[2] * tp]);
+          for (const [a, b, c] of triangulate(ccw(f.pts))) {
+            const h = (q: { x: number; y: number }) => eaveY + tp * ((q as unknown as { t: number }).t / 1000);   // triangulate keeps the original point objects, so t survives
+            roofB.tri(world(a, h(a)), world(b, h(b)), world(c, h(c)), n);
+          }
+        }
+        for (const [a, b, c] of triangulate(ccw(hip.outline))) roofB.tri(world(a, eaveY), world(b, eaveY), world(c, eaveY), mul(Y, -1));
+        push('roof', 'Hip roof', -1, 'roof', roofB);
+        hipDone = true;
+      } else warnings.push('Hip roof: the outer walls do not form one closed loop, so a simple rectangular hip is shown.');
+    }
+    if (hipDone) { /* built above */ } else if (rt === 'gable' || rt === 'hip') {
       const ridgeX = S.roof.ridge === 'auto' ? W >= D : S.roof.ridge === 'x';
       // work in (along, across) coordinates then map back to world
       const along = ridgeX ? W : D, across = ridgeX ? D : W;

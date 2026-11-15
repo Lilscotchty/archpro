@@ -3,6 +3,7 @@
 // -> black-and-white FRONT / REAR / LEFT / RIGHT elevations on an A3 sheet.
 // UI matches the Drafting Studio: title bar, tool palette, canvas, properties panel, status bar.
 
+import { ThemeToggle } from '../theme';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlanViewport } from './PlanViewport';
 import { OpeningThumb } from './OpeningThumb';
@@ -33,7 +34,7 @@ const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 const C = { wall: '#e11d48', sel: '#f59e0b', win: '#2563eb', door: '#16a34a', cal: '#7c3aed' };
 
 // interface palette (same tokens as the Drafting Studio)
-const UI = { bg: '#15171a', panel: '#1f2227', rule: '#2e333a', text: '#c9cfd6', dim: '#7d8590', accent: '#4aa3ff', grid: '#e5484d', door: '#f5b83d', win: '#3ddbd9' };
+const UI = { bg: 'var(--ui-bg)', panel: 'var(--ui-panel)', rule: 'var(--ui-rule)', text: 'var(--ui-text)', dim: 'var(--ui-dim)', accent: 'var(--ui-accent)', grid: 'var(--ui-danger)', door: 'var(--ui-warn)', win: '#3ddbd9' };
 const MONO = 'ui-monospace, "JetBrains Mono", Consolas, monospace';
 
 const ICONS: Record<string, string> = {
@@ -80,20 +81,20 @@ function projectOnWall(p: Pt, w: ExtWall) {
 const SIDE_LABEL: Record<PlanSide, string> = { top: 'Top of plan', bottom: 'Bottom of plan', left: 'Left of plan', right: 'Right of plan' };
 
 // ---------- shared UI pieces (module level so inputs never remount) ----------
-const inputCls = 'w-full bg-[#15171a] border border-[#2e333a] rounded-[3px] px-2 py-1.5 text-xs text-[#c9cfd6] font-mono focus:outline-none focus:border-[#4aa3ff]';
-const btnGhost = 'px-3 py-1.5 text-xs border border-[#2e333a] rounded-[3px] hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed';
-const btnPrimary = 'px-3 py-1.5 text-xs rounded-[3px] font-medium bg-[#4aa3ff] text-[#06121f] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed';
-const btnDanger = 'px-3 py-1.5 text-xs border border-[#e5484d] text-[#e5484d] rounded-[3px] hover:bg-[#e5484d]/10 disabled:opacity-40 disabled:cursor-not-allowed';
-const boxCls = 'border border-[#2e333a] rounded-[3px] p-3 bg-[#181a1e]';
-const errCls = 'text-xs text-[#ff9ea1] bg-[#e5484d]/10 border border-[#e5484d]/50 rounded-[3px] p-2';
-const warnCls = 'text-xs text-[#f5b83d] bg-[#f5b83d]/10 border border-[#f5b83d]/40 rounded-[3px] p-2';
+const inputCls = 'w-full bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[var(--ui-r)] px-2 py-1.5 text-xs text-[var(--ui-text)] font-mono focus:outline-none focus:border-[var(--ui-accent)]';
+const btnGhost = 'px-3 py-1.5 text-xs border border-[var(--ui-rule)] rounded-[var(--ui-r)] hover:bg-[var(--ui-hover)] disabled:opacity-40 disabled:cursor-not-allowed';
+const btnPrimary = 'px-3 py-1.5 text-xs rounded-[var(--ui-r)] font-medium bg-[var(--ui-accent)] text-[var(--ui-accentInk)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed';
+const btnDanger = 'px-3 py-1.5 text-xs border border-[var(--ui-danger)] text-[var(--ui-danger)] rounded-[var(--ui-r)] hover:bg-[color-mix(in_srgb,var(--ui-danger)_10%,transparent)] disabled:opacity-40 disabled:cursor-not-allowed';
+const boxCls = 'border border-[var(--ui-rule)] rounded-[var(--ui-r)] p-3 bg-[var(--ui-raised)]';
+const errCls = 'text-xs text-[var(--ui-dangerText)] bg-[color-mix(in_srgb,var(--ui-danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--ui-danger)_50%,transparent)] rounded-[var(--ui-r)] p-2';
+const warnCls = 'text-xs text-[var(--ui-warn)] bg-[color-mix(in_srgb,var(--ui-warn)_10%,transparent)] border border-[color-mix(in_srgb,var(--ui-warn)_40%,transparent)] rounded-[var(--ui-r)] p-2';
 
 const Icon = ({ n, s = 18 }: { n: string; s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS[n]} /></svg>
 );
 const PaletteBtn: React.FC<{ on?: boolean; onClick: () => void; title: string; disabled?: boolean; children: React.ReactNode }> = ({ on, onClick, title, disabled, children }) => (
-  <button title={title} onClick={onClick} disabled={disabled} style={{ background: on ? UI.accent : 'transparent', color: on ? '#06121f' : UI.text }}
-    className="w-9 h-9 grid place-items-center rounded-[3px] hover:brightness-125 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline outline-2 outline-offset-1">{children}</button>
+  <button title={title} onClick={onClick} disabled={disabled} style={{ background: on ? UI.accent : 'transparent', color: on ? 'var(--ui-accentInk)' : UI.text }}
+    className="w-9 h-9 grid place-items-center rounded-[var(--ui-r)] hover:brightness-125 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline outline-2 outline-offset-1">{children}</button>
 );
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div style={{ borderColor: UI.rule }} className="border-b px-3 py-3 space-y-2">
@@ -538,13 +539,13 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
     <div className="h-screen w-full flex flex-col select-none" style={{ background: UI.bg, color: UI.text, fontFamily: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif', fontSize: 13 }}>
       {/* ---------------- title bar */}
       <header style={{ background: UI.panel, borderColor: UI.rule }} className="h-11 flex items-center gap-3 px-3 border-b shrink-0">
-        <button onClick={onClose} className="font-semibold tracking-tight hover:text-white" title="Back to dashboard">ArchPro</button>
+        <button onClick={onClose} className="font-semibold tracking-tight hover:text-[var(--ui-strong)]" title="Back to dashboard">ArchPro</button>
         <span style={{ color: UI.dim }}>/ Elevation studio</span>
 
         <nav className="flex items-center gap-1 ml-4">
           {([1, 2, 3, 4] as Step[]).map(s => (
             <button key={s} onClick={() => goStep(s)} disabled={!canGo(s)}
-              className={`px-2.5 py-1 text-xs rounded-[3px] ${step === s ? 'bg-[#4aa3ff] text-[#06121f] font-medium' : canGo(s) ? 'hover:bg-white/5' : 'cursor-not-allowed'}`}
+              className={`px-2.5 py-1 text-xs rounded-[var(--ui-r)] ${step === s ? 'bg-[var(--ui-accent)] text-[var(--ui-accentInk)] font-medium' : canGo(s) ? 'hover:bg-[var(--ui-hover)]' : 'cursor-not-allowed'}`}
               style={step !== s && !canGo(s) ? { color: UI.dim, opacity: 0.5 } : undefined}>
               {s}  {stepTitles[s]}
             </button>
@@ -562,6 +563,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
             <button onClick={exportPNG} disabled={!result?.sheet || busy} className={btnPrimary}>{busy ? 'Exporting…' : 'Download PNG'}</button>
           </>
         )}
+        <ThemeToggle />
       </header>
 
       <div className="flex-1 flex min-h-0">
@@ -586,7 +588,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
           {step === 4 ? (
             <div className="absolute inset-0 overflow-auto p-6 flex justify-center items-start">
               {result?.error ? (
-                <div style={{ background: UI.panel, borderColor: UI.rule }} className="mt-20 max-w-md text-center border rounded-[3px] p-6">
+                <div style={{ background: UI.panel, borderColor: UI.rule }} className="mt-20 max-w-md text-center border rounded-[var(--ui-r)] p-6">
                   <div className="font-semibold mb-1">Can’t draw the elevations yet</div>
                   <div className="text-xs" style={{ color: UI.dim }}>{result.error}</div>
                 </div>
@@ -603,7 +605,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
               onDragStart={onDragStart} onDrag={onDrag} onDragEnd={onDragEnd}
               overlay={overlay}
             >
-              <div style={{ background: 'rgba(31,34,39,.9)', borderColor: UI.rule, fontFamily: MONO }} className="absolute left-3 top-3 z-10 px-2.5 py-1.5 border rounded-[3px] text-xs pointer-events-none">{hint}</div>
+              <div style={{ background: 'rgba(31,34,39,.9)', borderColor: UI.rule, fontFamily: MONO }} className="absolute left-3 top-3 z-10 px-2.5 py-1.5 border rounded-[var(--ui-r)] text-xs pointer-events-none">{hint}</div>
             </PlanViewport>
           ) : (
             <div className="absolute inset-0 grid place-items-center">
@@ -622,7 +624,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
           {step === 1 && (
             <>
               <Section title="Floor plan">
-                <div className="relative p-4 border border-dashed rounded-[3px] text-center hover:border-[#4aa3ff]" style={{ borderColor: UI.rule }}
+                <div className="relative p-4 border border-dashed rounded-[var(--ui-r)] text-center hover:border-[var(--ui-accent)]" style={{ borderColor: UI.rule }}
                   onDragOver={e => e.preventDefault()}
                   onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) loadFile(f); }}>
                   <input type="file" accept="image/*,application/pdf,.pdf" className="absolute inset-0 opacity-0 cursor-pointer"
@@ -652,12 +654,12 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
                   {calPts.length === 2 && (
                     <div className="flex gap-2">
                       <input className={inputCls} type="number" min={0} placeholder="Real length" value={calText} onChange={e => setCalText(e.target.value)} />
-                      <select className="w-16 bg-[#15171a] border border-[#2e333a] rounded-[3px] px-1.5 text-xs font-mono text-[#c9cfd6]" value={calUnit} onChange={e => setCalUnit(e.target.value as 'mm' | 'm')}><option>mm</option><option>m</option></select>
+                      <select className="w-16 bg-[var(--ui-bg)] border border-[var(--ui-rule)] rounded-[var(--ui-r)] px-1.5 text-xs font-mono text-[var(--ui-text)]" value={calUnit} onChange={e => setCalUnit(e.target.value as 'mm' | 'm')}><option>mm</option><option>m</option></select>
                       <button onClick={applyCal} className={btnPrimary}>Set</button>
                     </div>
                   )}
                   {cal && <div className="text-xs font-mono" style={{ color: UI.win }}>Scale set: 1 px = {cal.mmPerPx.toFixed(2)} mm</div>}
-                  {calPts.length > 0 && <button onClick={() => setCalPts([])} className="text-xs underline hover:text-white" style={{ color: UI.dim }}>Start over</button>}
+                  {calPts.length > 0 && <button onClick={() => setCalPts([])} className="text-xs underline hover:text-[var(--ui-strong)]" style={{ color: UI.dim }}>Start over</button>}
                 </Section>
               )}
             </>
@@ -698,7 +700,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
                           const on = nextStyle[kind] === s.id;
                           return (
                             <button key={s.id} onClick={() => setNextStyle(n => ({ ...n, [kind]: s.id }))}
-                              className={`rounded-[3px] border p-1 text-[10px] leading-tight ${on ? 'border-[#4aa3ff] bg-[#4aa3ff]/10' : 'border-[#2e333a] hover:bg-white/5'}`}>
+                              className={`rounded-[var(--ui-r)] border p-1 text-[10px] leading-tight ${on ? 'border-[var(--ui-accent)] bg-[color-mix(in_srgb,var(--ui-accent)_10%,transparent)]' : 'border-[var(--ui-rule)] hover:bg-[var(--ui-hover)]'}`}>
                               <OpeningThumb kind={kind} style={s.id} className="w-full h-16 rounded bg-white" />
                               <div className="mt-1">{s.label}</div>
                             </button>
@@ -716,12 +718,12 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
               {selected && (
                 <Section title={`${marks.tagOf(selected)}, ${selected.kind === 'window' ? 'window' : 'door'}`}>
                   <div className="flex justify-end -mt-6">
-                    <button onClick={() => setSelOpening(null)} className="text-xs hover:text-white" style={{ color: UI.dim }}>Done</button>
+                    <button onClick={() => setSelOpening(null)} className="text-xs hover:text-[var(--ui-strong)]" style={{ color: UI.dim }}>Done</button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {(selected.kind === 'window' ? WINDOW_STYLES : DOOR_STYLES).map(s => (
                       <button key={s.id} onClick={() => patchOpening(selected.id, { style: s.id })}
-                        className={`rounded-[3px] border p-1 text-[10px] leading-tight ${selected.style === s.id ? 'border-[#4aa3ff] bg-[#4aa3ff]/10' : 'border-[#2e333a] hover:bg-white/5'}`}>
+                        className={`rounded-[var(--ui-r)] border p-1 text-[10px] leading-tight ${selected.style === s.id ? 'border-[var(--ui-accent)] bg-[color-mix(in_srgb,var(--ui-accent)_10%,transparent)]' : 'border-[var(--ui-rule)] hover:bg-[var(--ui-hover)]'}`}>
                         <OpeningThumb kind={selected.kind} style={s.id} hinge={selected.hinge} className="w-full h-14 rounded bg-white" />
                         <div className="mt-1">{s.label}</div>
                       </button>
@@ -760,7 +762,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
                   {doc.openings.length === 0 && <div className="text-xs" style={{ color: UI.dim }}>None yet.</div>}
                   {doc.openings.map(o => (
                     <button key={o.id} onClick={() => { setSelOpening(o.id); pickTool('select'); }}
-                      className={`w-full text-left text-xs px-2 py-1.5 rounded-[3px] border font-mono ${o.id === selOpening ? 'border-[#f5b83d]' : 'border-[#2e333a] hover:bg-white/5'}`}>
+                      className={`w-full text-left text-xs px-2 py-1.5 rounded-[var(--ui-r)] border font-mono ${o.id === selOpening ? 'border-[var(--ui-warn)]' : 'border-[var(--ui-rule)] hover:bg-[var(--ui-hover)]'}`}>
                       <b>{marks.tagOf(o)}</b> {o.width}×{o.height}{o.kind === 'window' ? `, sill ${o.sill}` : ''}, {o.level === 'all' ? 'all floors' : o.level === 0 ? 'ground' : `floor ${o.level}`}
                     </button>
                   ))}
@@ -817,7 +819,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
                 <div className="grid grid-cols-4 gap-1">
                   {(['top', 'bottom', 'left', 'right'] as PlanSide[]).map(s => (
                     <button key={s} onClick={() => patchSpecs({ frontSide: s })}
-                      className={`py-1.5 text-xs rounded-[3px] border ${specs.frontSide === s ? 'bg-[#4aa3ff] border-[#4aa3ff] text-[#06121f] font-medium' : 'border-[#2e333a] hover:bg-white/5'}`}>{s}</button>
+                      className={`py-1.5 text-xs rounded-[var(--ui-r)] border ${specs.frontSide === s ? 'bg-[var(--ui-accent)] border-[var(--ui-accent)] text-[var(--ui-accentInk)] font-medium' : 'border-[var(--ui-rule)] hover:bg-[var(--ui-hover)]'}`}>{s}</button>
                   ))}
                 </div>
                 <MiniPlan walls={doc.walls} front={specs.frontSide} />
@@ -846,7 +848,7 @@ export const ElevationStudio: React.FC<ElevationStudioProps> = ({ onClose, initi
       </div>
 
       {/* ---------------- status bar */}
-      <footer style={{ background: '#181a1e', borderColor: UI.rule, fontFamily: MONO, color: UI.dim }} className="h-7 border-t flex items-center gap-4 px-3 text-xs shrink-0">
+      <footer style={{ background: 'var(--ui-raised)', borderColor: UI.rule, fontFamily: MONO, color: UI.dim }} className="h-7 border-t flex items-center gap-4 px-3 text-xs shrink-0">
         <span style={{ color: UI.text }} className="w-44">X {hover ? Math.round(hover.x) : '-'}  Y {hover ? Math.round(hover.y) : '-'}</span>
         {step === 2 && (
           <>

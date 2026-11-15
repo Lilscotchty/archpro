@@ -61,3 +61,48 @@ export const DEFAULT_RATES: RateLibrary = {
 
 export const blockRateKey = (thicknessMm: number) =>
   thicknessMm <= 125 ? 'f10.b100' : thicknessMm <= 190 ? 'f10.b150' : 'f10.b225';
+
+// ---------------------------------------------------------------- CSV import / export of the rate library
+const q = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+export const today = () => new Date().toISOString().slice(0, 10);
+
+export function ratesToCsv(rates: RateLibrary): string {
+  const rows = [['key', 'item', 'unit', 'rate', 'source', 'updated'], ...Object.keys(rates).sort().map(k => [k, rates[k].label, rates[k].unit, rates[k].rate, rates[k].source ?? '', rates[k].updated ?? ''])];
+  return rows.map(r => r.map(q).join(',')).join('\n');
+}
+
+export function parseCsv(text: string): string[][] {
+  const out: string[][] = []; let row: string[] = [], cell = '', inQ = false;
+  const t = text.replace(/^\uFEFF/, '');
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inQ) { if (c === '"') { if (t[i + 1] === '"') { cell += '"'; i++; } else inQ = false; } else cell += c; }
+    else if (c === '"') inQ = true;
+    else if (c === ',' || c === ';' || c === '\t') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cell); cell = ''; if (row.some(x => x.trim())) out.push(row); row = []; }
+    else cell += c;
+  }
+  row.push(cell); if (row.some(x => x.trim())) out.push(row);
+  return out;
+}
+
+/** Update the library from a CSV with columns key (or item), rate and optionally source, updated. Unknown keys are reported, never invented. */
+export function importRatesCsv(lib: RateLibrary, text: string, defaultSource: string): { rates: RateLibrary; applied: number; skipped: string[] } {
+  const rows = parseCsv(text); if (rows.length < 2) throw new Error('The file has no rows.');
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const col = (...n: string[]) => head.findIndex(h => n.includes(h));
+  const iKey = col('key', 'code'), iItem = col('item', 'label', 'description'), iRate = col('rate', 'price', 'amount'), iSrc = col('source', 'supplier'), iUpd = col('updated', 'date');
+  if (iRate < 0 || (iKey < 0 && iItem < 0)) throw new Error('Needs a "rate" column and a "key" (or "item") column. Export the current rates to see the layout.');
+  const next: RateLibrary = { ...lib }; const skipped: string[] = []; let applied = 0;
+  const byLabel = new Map(Object.entries(lib).map(([k, v]) => [v.label.toLowerCase(), k]));
+  for (const r of rows.slice(1)) {
+    const key = (iKey >= 0 && lib[r[iKey]?.trim()] ? r[iKey].trim() : undefined) ?? (iItem >= 0 ? byLabel.get(r[iItem]?.trim().toLowerCase()) : undefined);
+    const rate = parseFloat(String(r[iRate] ?? '').replace(/[^0-9.\-]/g, ''));
+    if (!key || !Number.isFinite(rate) || rate < 0) { skipped.push((iKey >= 0 ? r[iKey] : r[iItem]) || '(blank)'); continue; }
+    const hasDate = iUpd >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(r[iUpd]?.trim() ?? '');
+    if (rate === lib[key].rate && !hasDate && !lib[key].updated) continue;   // unchanged placeholder: do not mark it as a real price
+    const upd = iUpd >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(r[iUpd]?.trim() ?? '') ? r[iUpd].trim() : today();
+    next[key] = { ...next[key], rate, updated: upd, source: (iSrc >= 0 && r[iSrc]?.trim()) || defaultSource }; applied++;
+  }
+  return { rates: next, applied, skipped };
+}

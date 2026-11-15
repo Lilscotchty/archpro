@@ -1,3 +1,4 @@
+import { ThemeToggle } from './theme';
 import React from 'react';
 import { AppModule } from '../types';
 
@@ -5,90 +6,108 @@ interface DashboardProps {
   onSelectModule: (module: AppModule) => void;
 }
 
-const I = (d: string) => (
-  <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d={d} /></svg>
-);
-
-const MODULES = [
-  { id: AppModule.DRAWINGS, title: 'Drawings & Simulation', tag: '2D + 3D', hot: '1', grad: ['#5aaeff', '#22d3ee'],
-    desc: 'Trace a plan, lay out grids and walls, generate the foundation sheet, and see the building in 3D.',
-    icon: I('M4 20L20 4M5 6h6v6H5zM13 14h6v6h-6z') },
-  { id: AppModule.ELEVATIONS, title: 'Elevation Studio', tag: 'New', hot: '2', grad: ['#fb7185', '#fb923c'],
-    desc: 'Upload a plan image or PDF, pick walls, windows and doors, and get clean front, rear and side elevations.',
-    icon: I('M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6') },
-  { id: AppModule.MEASUREMENT, title: 'Calculation & Measurement', tag: 'SMM7', hot: '3', grad: ['#34d399', '#2dd4bf'],
-    desc: 'Bills of quantities and material take-offs from your drawings, with an AI assistant for descriptions.',
-    icon: I('M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2') },
-  { id: AppModule.METHOD_STUDY, title: 'Method Study', tag: 'Programme', hot: '4', grad: ['#a78bfa', '#818cf8'],
-    desc: 'Build the construction programme with critical path and keep the site risk register.',
-    icon: I('M4 20V8l6-4v16M10 20V10l10 4v6M3 20h18') },
-  { id: AppModule.PHYSICS, title: 'Building Physics Lab', tag: 'Analysis', hot: '5', grad: ['#fbbf24', '#f59e0b'],
-    desc: 'U-values and heat loss, slab load take-down, and embodied carbon estimates.',
-    icon: I('M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3M8 15h8') },
-];
-
 export const Dashboard: React.FC<DashboardProps> = ({ onSelectModule }) => {
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || e.metaKey || e.ctrlKey || e.altKey) return;
-      const m = MODULES.find(x => x.hot === e.key);
-      if (m) onSelectModule(m.id);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onSelectModule]);
+  const modules = [
+    {
+      id: AppModule.DRAWINGS,
+      title: 'Drawings & Simulation',
+      desc: 'AI-assisted structural layouts, foundation generation, and auto-drafting.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+      ),
+      gradient: 'from-blue-500 to-cyan-400'
+    },
+    {
+      id: AppModule.ELEVATIONS,
+      title: 'Elevation Studio',
+      desc: 'Upload a plan (image or PDF), pick the external walls, windows and doors, and get front, rear and side elevations as clean black-and-white line drawings.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6M7 13h.01M17 13h.01" /></svg>
+      ),
+      gradient: 'from-rose-500 to-orange-400'
+    },
+    {
+      id: AppModule.MEASUREMENT,
+      title: 'Calculation & Measurement',
+      desc: 'SMM7 Bill of Quantities, material take-offs, and cost estimation.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+      ),
+      gradient: 'from-emerald-500 to-teal-400'
+    },
+    {
+      id: AppModule.METHOD_STUDY,
+      title: 'Method Study',
+      desc: 'Site organization, safety plans, and construction methodology.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+      ),
+      gradient: 'from-purple-500 to-pink-400'
+    },
+    {
+      id: AppModule.PHYSICS,
+      title: 'Building Physics Lab',
+      desc: 'Thermal calculations, structural load analysis, and environmental impact.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+      ),
+      gradient: 'from-amber-500 to-orange-400'
+    }
+  ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ color: '#d6dbe2', fontFamily: '"IBM Plex Sans","Segoe UI",system-ui,sans-serif' }}>
-      {/* aurora */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div style={{ position: 'absolute', top: '-18%', left: '-10%', width: '60vw', height: '60vw', borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(90,174,255,.28), transparent)', filter: 'blur(40px)', animation: 'aurora 16s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', top: '10%', right: '-15%', width: '55vw', height: '55vw', borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(167,139,250,.24), transparent)', filter: 'blur(48px)', animation: 'aurora 20s ease-in-out infinite reverse' }} />
-        <div style={{ position: 'absolute', bottom: '-25%', left: '25%', width: '50vw', height: '40vw', borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(52,211,153,.14), transparent)', filter: 'blur(50px)', animation: 'aurora 24s ease-in-out infinite' }} />
-        <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px)', backgroundSize: '56px 56px', maskImage: 'radial-gradient(ellipse at 50% 30%, #000 25%, transparent 75%)', WebkitMaskImage: 'radial-gradient(ellipse at 50% 30%, #000 25%, transparent 75%)' }} />
+    <div className="legacy-dash flex flex-col items-center justify-center min-h-screen p-8 relative z-10">
+      <div className="absolute top-4 right-4 z-20"><ThemeToggle /></div>
+      {/* Styles scoped to the dashboard only, so other pages keep the unified studio look */}
+      <style>{`
+        .legacy-dash { background-color: var(--ui-bg); color: var(--ui-text); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+        .legacy-dash .glass-panel { background: var(--ui-panel); border: 1px solid var(--ui-rule); box-shadow: var(--ui-shadow); }
+        .legacy-dash .glass-panel:hover { background: var(--ui-hover); }
+      `}</style>
+      
+      {/* HEADER SECTION */}
+      <div className="text-center mb-10">
+        <h1 className="text-4xl font-semibold mb-2 tracking-tight" style={{ color: 'var(--ui-strong)' }}>
+          Construct<span style={{ color: 'var(--ui-accent)' }}>OS</span>
+        </h1>
+        <p className="text-base max-w-xl mx-auto" style={{ color: 'var(--ui-dim)' }}>
+          The Spatial Engineering Platform.
+        </p>
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 sm:px-10 pt-14 pb-16">
-        <div className="flex items-center gap-3" style={{ animation: 'rise .6s ease both' }}>
-          <span className="grid place-items-center w-11 h-11 rounded-xl text-xl font-black" style={{ color: '#04101c', background: 'linear-gradient(135deg,#7cc4ff,#7c8cff)', boxShadow: '0 10px 30px -8px rgba(90,174,255,.8)' }}>A</span>
-          <span className="text-lg font-semibold tracking-tight">ArchPro</span>
-          <span className="ml-1 px-2.5 py-0.5 rounded-full text-xs border" style={{ borderColor: 'rgba(255,255,255,.14)', color: '#8a94a2' }}>Construction studio</span>
-        </div>
-
-        <h1 className="mt-10 font-semibold tracking-tight" style={{ fontSize: 'clamp(2.4rem, 5.6vw, 4.2rem)', lineHeight: 1.04, animation: 'rise .7s .05s ease both' }}>
-          From a sketch to a{' '}
-          <span style={{ background: 'linear-gradient(100deg,#7cc4ff,#a78bfa 55%,#fb7185)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>buildable model</span>.
-        </h1>
-        <p className="mt-5 max-w-2xl text-lg" style={{ color: '#8a94a2', animation: 'rise .7s .12s ease both' }}>
-          Draw the plan, generate elevations, take off quantities and plan the build, all in one place. Pick a studio to begin, or press its number key.
-        </p>
-
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {MODULES.map((m, i) => (
-            <button key={m.id} onClick={() => onSelectModule(m.id)}
-              className="group relative text-left rounded-2xl p-6 border overflow-hidden"
-              style={{ background: 'linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02))', borderColor: 'rgba(255,255,255,.09)', backdropFilter: 'blur(14px)', animation: `rise .6s ${0.18 + i * 0.07}s ease both`, transition: 'transform .25s ease, border-color .25s ease, box-shadow .25s ease' }}
-              onMouseEnter={e => { const el = e.currentTarget; el.style.transform = 'translateY(-4px)'; el.style.borderColor = m.grad[0] + '88'; el.style.boxShadow = `0 24px 60px -24px ${m.grad[0]}99`; }}
-              onMouseLeave={e => { const el = e.currentTarget; el.style.transform = ''; el.style.borderColor = 'rgba(255,255,255,.09)'; el.style.boxShadow = ''; }}>
-              <div aria-hidden className="absolute -top-16 -right-16 w-44 h-44 rounded-full opacity-0 group-hover:opacity-100" style={{ background: `radial-gradient(closest-side, ${m.grad[0]}55, transparent)`, transition: 'opacity .3s ease' }} />
-              <div className="relative flex items-start justify-between">
-                <span className="grid place-items-center w-14 h-14 rounded-2xl" style={{ color: '#04101c', background: `linear-gradient(135deg, ${m.grad[0]}, ${m.grad[1]})`, boxShadow: `0 12px 28px -10px ${m.grad[0]}` }}>{m.icon}</span>
-                <span className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-xs border" style={{ borderColor: m.grad[0] + '66', color: m.grad[0] }}>{m.tag}</span>
-                  <kbd className="px-2 py-0.5 rounded-md text-xs border" style={{ borderColor: 'rgba(255,255,255,.14)', color: '#8a94a2', fontFamily: 'ui-monospace, monospace' }}>{m.hot}</kbd>
-                </span>
+      {/* CARDS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl w-full">
+        {modules.map((mod, idx) => (
+          <button
+            key={mod.id}
+            onClick={() => onSelectModule(mod.id)}
+            className="glass-panel group rounded-xl p-6 text-left relative flex items-start transition-colors duration-150"
+          >
+            
+            <div className="flex items-start gap-5 relative z-10">
+              <div className="p-3 rounded-[var(--ui-r)] shrink-0" style={{ background: 'color-mix(in srgb, var(--ui-accent) 12%, transparent)', color: 'var(--ui-accent)' }}>
+                {mod.icon}
               </div>
-              <h2 className="relative mt-5 text-xl font-semibold tracking-tight" style={{ color: '#f1f4f8' }}>{m.title}</h2>
-              <p className="relative mt-2 text-base leading-relaxed" style={{ color: '#8a94a2' }}>{m.desc}</p>
-              <div className="relative mt-5 flex items-center gap-1.5 text-sm font-medium" style={{ color: m.grad[0] }}>
-                Open studio <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
+              <div>
+                <h3 className="text-lg font-semibold mb-1" style={{ color: 'var(--ui-strong)' }}>
+                  {mod.title}
+                </h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--ui-dim)' }}>
+                  {mod.desc}
+                </p>
               </div>
-            </button>
-          ))}
-        </div>
+            </div>
 
-        <div className="mt-14 text-sm" style={{ color: '#5d6672', fontFamily: 'ui-monospace, monospace' }}>ArchPro · SMM7 engine</div>
+            {/* ACTION ARROW */}
+            <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+               <svg className="w-5 h-5" style={{ color: 'var(--ui-accent)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+            </div>
+          </button>
+        ))}
+      </div>
+      
+      <div className="mt-16 text-xs" style={{ color: 'var(--ui-dim)' }}>
+        v2.6.0 Stable / SMM7 Engine
       </div>
     </div>
   );

@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { BoqState } from './useBoqState';
 import { NumInput, TextInput, Select, fmt } from './fields';
-import { Empty, Icon, Tag, UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
-import { PricedLine } from '../../utils/boq/pricing';
+import { Empty, Icon, Tag, UI, MONO, btnGhost, btnPrimary, inputCls, tint } from '../ui';
+import { PricedLine, placeholderStats, rateWarning } from '../../utils/boq/pricing';
 import { SECTIONS } from '../../utils/boq/types';
 import { refOf } from '../../utils/boq/export';
 
@@ -21,15 +21,26 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
   });
   const total = s.summary.sections;
   if (total.length === 0 && s.customs.length === 0)
-    return <Empty icon="measure" title="Nothing to measure yet" hint="Draw walls in the Drafting Studio, or add walls on the Schedule tab, or read a drawing on the AI tab. The bill builds itself as you go." />;
+    return <Empty icon="measure" title="Nothing to measure yet" hint="Add the building size in the Project step, then read a drawing or add walls in the Quantities step. The bill builds itself as you go." />;
 
   return (
-    <div className="max-w-6xl mx-auto grid gap-4">
-      {s.built.geo.warnings.map((w, i) => <div key={i} className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.warn + '88', color: UI.warn }}>{w}</div>)}
+    <div className="max-w-5xl mx-auto grid gap-4">
+      {(() => {
+        const items: { tone: 'danger' | 'warn'; text: string }[] = [];
+        const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); if (w) items.push({ tone: 'danger', text: w });
+        if (s.model.walls.some(x => x.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) items.push({ tone: 'warn', text: 'Some quantities were read by the AI. Check them against the drawing in the Quantities step.' });
+        s.built.geo.warnings.forEach(x => items.push({ tone: 'warn', text: x }));
+        if (!items.length) return null;
+        const c = items.some(i => i.tone === 'danger') ? UI.danger : UI.warn;
+        return <div className="text-xs border rounded-[var(--ui-r)] p-3" style={{ borderColor: tint(c, 24), background: tint(c, 6) }}>
+          <div className="font-semibold mb-1" style={{ color: c }}>Check before you use this total ({items.length})</div>
+          <ul className="space-y-1" style={{ color: UI.text }}>{items.map((i, k) => <li key={k} className="flex gap-2"><span style={{ color: i.tone === 'danger' ? UI.danger : UI.warn }}>•</span><span>{i.text}</span></li>)}</ul>
+        </div>;
+      })()}
       {total.map(sec => (
-        <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">
+        <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: UI.rule, background: UI.raised }}>
-            <div className="text-xs font-semibold" style={{ color: '#e6e9ed' }}><span style={{ fontFamily: MONO, color: UI.warn }}>{sec.code}</span> &nbsp; {sec.title}</div>
+            <div className="text-xs font-semibold" style={{ color: 'var(--ui-strong)' }}><span style={{ fontFamily: MONO, color: UI.warn }}>{sec.code}</span> &nbsp; {sec.title}</div>
             <div className="text-xs" style={{ fontFamily: MONO }}>{cur} {fmt(sec.total)}</div>
           </div>
           <table className="w-full text-xs">
@@ -56,7 +67,7 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
                       {l.custom ? <span style={{ fontFamily: MONO }}>{fmt(l.rate)}</span>
                         : <NumInput className={inputCls + ' text-right'} value={l.rate} onChange={n => setOv(l.key, { rate: n }, l)} />}
                     </td>
-                    <td className="px-3 py-2 text-right" style={{ fontFamily: MONO, color: '#e6e9ed' }}>{fmt(l.amount)}</td>
+                    <td className="px-3 py-2 text-right" style={{ fontFamily: MONO, color: 'var(--ui-strong)' }}>{fmt(l.amount)}</td>
                     <td className="px-1 py-1 text-right whitespace-nowrap">
                       {l.custom
                         ? <button title="Delete item" className="p-1" style={{ color: UI.dim }} onClick={() => s.setCustoms(c => c.filter(x => x.id !== l.key))}><Icon n="trash" s={14} /></button>
@@ -78,8 +89,8 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
         </div>
       ))}
 
-      <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] p-3">
-        <div className="text-xs font-semibold mb-2" style={{ color: '#e6e9ed' }}>Add your own item</div>
+      <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)] p-3">
+        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--ui-strong)' }}>Add your own item</div>
         <div className="grid grid-cols-12 gap-2 items-end">
           <div className="col-span-3"><Select value={nl.section} onChange={v => setNl({ ...nl, section: v })} options={SECTIONS.map(x => [x.code, `${x.code} ${x.title}`] as [string, string])} /></div>
           <div className="col-span-4"><TextInput value={nl.description} placeholder="Description" onChange={v => setNl({ ...nl, description: v })} /></div>

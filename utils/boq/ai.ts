@@ -1,12 +1,24 @@
 // utils/boq/ai.ts
 // Reads architectural drawings with a Groq vision model and turns the answer into schedule rows.
 // The model only READS what is printed on the drawing. Nothing it returns reaches the bill until the
-// user has reviewed it on the Schedule tab, and every value is sanity-checked first.
+// user has reviewed it in the Quantities step, and every value is sanity-checked first.
 
-import { Assumptions, BoqModel, OpeningRow, WallRow } from './types';
+import { Assumptions, BoqModel, CeilingType, ColumnRow, FloorFinish, OpeningRow, RoofCovering, RoofType, WallRow } from './types';
 
-export const GROQ_BASE = 'https://api.groq.com/openai/v1';
-export const DEFAULT_GROQ_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+// Two free routes. 'gemini' reads the page image directly (Google AI Studio free tier). 'groq-text' never sends an image:
+// the page text is extracted in the browser (PDF text layer, or free in-browser OCR for scans) and a text model structures it.
+export type Provider = 'gemini' | 'groq-text';
+export const DEFAULT_MODEL: Record<Provider, string> = { gemini: 'gemini-3.1-flash-lite', 'groq-text': 'openai/gpt-oss-120b' };
+const RETIRED_GROQ = /llama-4-scout|llama-4-maverick|llama-3\.2-.*vision|llama-3\.3-70b-versatile|llama-3\.1-8b-instant|qwen3-32b/i;
+export function resolveModel(provider: Provider, m: string): string {
+  const t = m.trim();
+  if (!t) return DEFAULT_MODEL[provider];
+  if (provider === 'groq-text' && (RETIRED_GROQ.test(t) || t.startsWith('gemini'))) return DEFAULT_MODEL[provider];
+  if (provider === 'gemini' && !t.startsWith('gemini')) return DEFAULT_MODEL[provider];
+  return t;
+}
+/** Ids from Groq's list that are not chat models (speech, guard, embeddings). */
+export const isChatModelId = (id: string) => !/whisper|tts|orpheus|guard|safeguard|embed|compound/i.test(id);
 
 export interface AiOpening { mark: string; widthMm: number; heightMm: number | null; count: number; external: boolean | null; description: string | null }
 export interface AiExtraction {
@@ -17,6 +29,9 @@ export interface AiExtraction {
   rooms: { name: string; lengthM: number | null; widthM: number | null; areaM2: number | null }[];
   heights: { floorHeightMm: number | null; plinthMm: number | null; foundationDepthMm: number | null };
   floors: number | null;
+  roof: { type: RoofType | null; pitchDeg: number | null; covering: RoofCovering | null };
+  columns: { label: string; bMm: number; dMm: number; count: number }[];
+  stairs: number | null; ceiling: CeilingType | null; floorFinish: FloorFinish | null;
   specs: string[];
   warnings: string[];
 }
@@ -24,6 +39,7 @@ export interface AiExtraction {
 export const EMPTY_EXTRACTION: AiExtraction = {
   drawingType: 'unknown', scale: null, overall: { lengthM: null, widthM: null }, walls: [], doors: [], windows: [], rooms: [],
   heights: { floorHeightMm: null, plinthMm: null, foundationDepthMm: null }, floors: null, specs: [], warnings: [],
+  roof: { type: null, pitchDeg: null, covering: null }, columns: [], stairs: null, ceiling: null, floorFinish: null,
 };
 
 const SYSTEM = `You are a quantity surveyor's assistant that READS construction drawings. You never estimate or guess.
@@ -41,6 +57,11 @@ const SCHEMA = `{
  "doors":   [ { "mark": "D1", "widthMm": number, "heightMm": number or null, "count": integer, "external": true | false | null, "description": string or null } ],
  "windows": [ { "mark": "W1", "widthMm": number, "heightMm": number or null, "count": integer, "external": true | false | null, "description": string or null } ],
  "heights": { "floorHeightMm": number or null, "plinthMm": number or null, "foundationDepthMm": number or null },
+ "roof": { "type": "gable | hip | shed | flat | null", "pitchDeg": degrees printed on an elevation or section or null, "covering": "aluminium_sheet | concrete_tile | null" },
+ "columns": [ { "label": "C1", "bMm": number, "dMm": number, "count": integer } ],
+ "stairs": number of staircases shown or null,
+ "ceiling": "pvc | plasterboard | none | null (only if a note or finishes schedule says so)",
+ "floorFinish": "ceramic_tile | screed_only | none | null (only if a note or finishes schedule says so)",
  "specs": [ "short quotes of notes that affect quantities or pricing: concrete grade, block size, roof covering, finishes" ],
  "warnings": [ "anything unreadable, cropped, or contradictory" ]
 }`;
@@ -61,7 +82,7 @@ const num = (v: unknown): number | null => {
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
 export function extractJson(text: string): unknown {
-  const t = text.replace(/```json|```/gi, '').trim();
+  const t = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```json|```/gi, '').trim();
   try { return JSON.parse(t); } catch { /* fall through */ }
   const s = t.indexOf('{'), e = t.lastIndexOf('}');
   if (s >= 0 && e > s) return JSON.parse(t.slice(s, e + 1));
@@ -89,6 +110,15 @@ export function normalise(raw: unknown): AiExtraction {
     lengthM: num(w?.lengthM) ?? 0, thicknessMm: num(w?.thicknessMm),
   })).filter(w => w.lengthM > 0.3 && w.lengthM < 200);
   const L = num(r.overall?.lengthM), B = num(r.overall?.widthM);
+  const rt = str(r.roof?.type).toLowerCase(), rc = str(r.roof?.covering).toLowerCase(), pd = num(r.roof?.pitchDeg);
+  const roof = {
+    type: (/hip/.test(rt) ? 'hip' : /gable|pitch/.test(rt) ? 'gable' : /shed|mono|lean/.test(rt) ? 'shed' : /flat/.test(rt) ? 'flat' : null) as RoofType | null,
+    pitchDeg: pd !== null && pd >= 3 && pd <= 60 ? pd : null,
+    covering: (/tile/.test(rc) ? 'concrete_tile' : /alumin|sheet|zinc|iron|long/.test(rc) ? 'aluminium_sheet' : null) as RoofCovering | null,
+  };
+  const columns = (Array.isArray(r.columns) ? r.columns : []).map((c: any) => ({ label: str(c?.label) || 'C', bMm: num(c?.bMm) ?? 0, dMm: num(c?.dMm) ?? 0, count: Math.max(1, Math.round(num(c?.count) ?? 1)) }))
+    .filter((c: { bMm: number; dMm: number; count: number }) => c.bMm >= 100 && c.bMm <= 1500 && c.dMm >= 100 && c.dMm <= 1500 && c.count <= 200);
+  const st = num(r.stairs), cl = str(r.ceiling).toLowerCase(), ff = str(r.floorFinish).toLowerCase();
   const ex: AiExtraction = {
     drawingType: str(r.drawingType) || 'unknown', scale: str(r.scale) || null,
     floors: (() => { const f = num(r.floors); return f && f >= 1 && f <= 10 ? Math.round(f) : null; })(),
@@ -98,6 +128,9 @@ export function normalise(raw: unknown): AiExtraction {
     doors: list('doors').map(o => opening(o, 'door')).filter((o): o is AiOpening => !!o),
     windows: list('windows').map(o => opening(o, 'window')).filter((o): o is AiOpening => !!o),
     heights: { floorHeightMm: num(r.heights?.floorHeightMm), plinthMm: num(r.heights?.plinthMm), foundationDepthMm: num(r.heights?.foundationDepthMm) },
+    roof, columns, stairs: st !== null && st >= 0 && st <= 6 ? Math.round(st) : null,
+    ceiling: /pvc/.test(cl) ? 'pvc' : /plaster/.test(cl) ? 'plasterboard' : /none|no ceiling/.test(cl) ? 'none' : null,
+    floorFinish: /tile|ceramic|porcelain/.test(ff) ? 'ceramic_tile' : /screed|cement/.test(ff) ? 'screed_only' : /none/.test(ff) ? 'none' : null,
     specs: Array.isArray(r.specs) ? r.specs.map(str).filter(Boolean).slice(0, 20) : [],
     warnings,
   };
@@ -132,7 +165,7 @@ export function crossCheck(ex: AiExtraction): string[] {
 /** Merge results from several pages: schedules and plans often repeat the same marks, so take the larger count, not the sum. */
 export function mergeExtractions(list: AiExtraction[]): AiExtraction {
   if (list.length === 0) return EMPTY_EXTRACTION;
-  const out: AiExtraction = { ...EMPTY_EXTRACTION, overall: { lengthM: null, widthM: null }, heights: { ...EMPTY_EXTRACTION.heights }, walls: [], doors: [], windows: [], rooms: [], specs: [], warnings: [] };
+  const out: AiExtraction = { ...EMPTY_EXTRACTION, overall: { lengthM: null, widthM: null }, heights: { ...EMPTY_EXTRACTION.heights }, walls: [], doors: [], windows: [], rooms: [], specs: [], warnings: [], roof: { ...EMPTY_EXTRACTION.roof }, columns: [] };
   const byMark = (a: AiOpening[], b: AiOpening[]) => {
     const map = new Map(a.map(o => [`${o.mark.toLowerCase()}|${o.widthMm}`, o]));
     b.forEach(o => { const k = `${o.mark.toLowerCase()}|${o.widthMm}`; const e = map.get(k);
@@ -144,6 +177,9 @@ export function mergeExtractions(list: AiExtraction[]): AiExtraction {
     out.scale = out.scale ?? x.scale; out.floors = out.floors ?? x.floors;
     out.overall.lengthM = out.overall.lengthM ?? x.overall.lengthM; out.overall.widthM = out.overall.widthM ?? x.overall.widthM;
     if (x.walls.length > out.walls.length) out.walls = x.walls;
+    if (x.columns.length > out.columns.length) out.columns = x.columns;
+    out.roof = { type: out.roof.type ?? x.roof.type, pitchDeg: out.roof.pitchDeg ?? x.roof.pitchDeg, covering: out.roof.covering ?? x.roof.covering };
+    out.stairs = out.stairs ?? x.stairs; out.ceiling = out.ceiling ?? x.ceiling; out.floorFinish = out.floorFinish ?? x.floorFinish;
     out.doors = byMark(out.doors, x.doors); out.windows = byMark(out.windows, x.windows);
     const seen = new Set(out.rooms.map(r => r.name.toLowerCase()));
     x.rooms.forEach(r => { if (!seen.has(r.name.toLowerCase())) { out.rooms.push(r); seen.add(r.name.toLowerCase()); } });
@@ -184,62 +220,134 @@ export function applyExtraction(ex: AiExtraction, model: BoqModel, a: Assumption
   const open = [...toRows(ex.doors, 'door'), ...toRows(ex.windows, 'window')];
   if (open.length) summary.push(`${open.length} door/window types`);
 
+  const cols: ColumnRow[] = ex.columns.map((c, i) => ({ id: uid(), label: c.label || `C${i + 1}`, bMm: Math.round(c.bMm), dMm: Math.round(c.dMm), qty: c.count, source: 'ai' as const }));
+  if (cols.length) summary.push(`${cols.reduce((n, c) => n + c.qty, 0)} columns`);
   const next: Assumptions = { ...a };
+  if (ex.roof.type) { next.roofType = ex.roof.type; summary.push(`${ex.roof.type} roof`); }
+  if (ex.roof.pitchDeg) next.roofPitch = Math.round(ex.roof.pitchDeg);
+  if (ex.roof.covering) next.roofCovering = ex.roof.covering;
+  if (ex.stairs !== null) next.stairCount = ex.stairs;
+  if (ex.ceiling) next.ceiling = ex.ceiling;
+  if (ex.floorFinish) next.floorFinish = ex.floorFinish;
   if (ex.floors) { next.floors = ex.floors; summary.push(`${ex.floors} storey(s)`); }
   if (ex.heights.floorHeightMm) next.floorHeight = Math.round(ex.heights.floorHeightMm);
   if (ex.heights.plinthMm !== null) next.plinthHeight = Math.round(ex.heights.plinthMm);
   if (ex.heights.foundationDepthMm) next.foundationDepth = Math.round(ex.heights.foundationDepthMm);
   if (ex.heights.floorHeightMm || ex.heights.plinthMm !== null || ex.heights.foundationDepthMm) summary.push('levels');
 
-  return { model: { ...model, walls, footprint, openings: [...keep(model.openings), ...open] }, assumptions: next, summary };
+  return { model: { ...model, walls, footprint, openings: [...keep(model.openings), ...open], columns: [...keep(model.columns), ...cols] }, assumptions: next, summary };
 }
 
-// ---------------------------------------------------------------- Groq calls
-async function post(url: string, apiKey: string, body: unknown, signal?: AbortSignal) {
+// ---------------------------------------------------------------- provider calls
+export const GROQ_BASE = 'https://api.groq.com/openai/v1';
+export const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+async function send(name: string, url: string, init: RequestInit): Promise<any> {
   let res: Response;
-  try {
-    res = await fetch(url, { method: 'POST', signal, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: JSON.stringify(body) });
-  } catch (e) {
+  try { res = await fetch(url, init); }
+  catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    throw new Error('Could not reach api.groq.com. Check your internet connection, any ad-blocker or firewall, and that the key is correct.');
+    throw new Error(`Could not reach ${name}. Check your internet connection, any ad-blocker or firewall, and that the key is correct.`);
   }
   const text = await res.text();
   if (!res.ok) {
-    let msg = text; try { msg = JSON.parse(text)?.error?.message ?? text; } catch { /* keep raw */ }
-    const err = new Error(res.status === 401 ? 'Groq rejected the API key (401). Check the key and try again.'
-      : res.status === 429 ? 'Groq rate limit reached (429). Wait a minute and retry, or analyse fewer pages.'
-      : `Groq error ${res.status}: ${msg.slice(0, 300)}`);
+    let msg = text; try { const j = JSON.parse(text); msg = j?.error?.message ?? text; } catch { /* keep raw */ }
+    const err = new Error(res.status === 401 || res.status === 403 ? `${name} rejected the API key (${res.status}). Check the key and try again.`
+      : res.status === 429 ? `${name} free-tier rate limit reached (429). Wait a minute and retry, or read fewer pages.`
+      : `${name} error ${res.status}: ${msg.slice(0, 300)}`);
     (err as any).status = res.status; (err as any).detail = msg; throw err;
   }
   return JSON.parse(text);
 }
+const groqPost = (key: string, path: string, body: unknown, signal?: AbortSignal) =>
+  send('api.groq.com', `${GROQ_BASE}${path}`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify(body) });
 
 export async function listGroqModels(apiKey: string): Promise<string[]> {
-  const res = await fetch(`${GROQ_BASE}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
-  if (!res.ok) throw new Error(res.status === 401 ? 'Groq rejected the API key (401).' : `Could not list models (${res.status}).`);
-  const j = await res.json();
-  return (j.data as { id: string }[]).map(m => m.id).sort();
+  const j = await send('api.groq.com', `${GROQ_BASE}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
+  return (j.data as { id: string }[]).map(m => m.id).filter(isChatModelId).sort();
+}
+export async function listGeminiModels(apiKey: string): Promise<string[]> {
+  const j = await send('Google AI', `${GEMINI_BASE}/models?pageSize=200`, { headers: { 'x-goog-api-key': apiKey } });
+  return (j.models as { name: string; supportedGenerationMethods?: string[] }[])
+    .filter(m => m.supportedGenerationMethods?.includes('generateContent') && /gemini/.test(m.name) && !/image|tts|live|embed|veo|imagen|audio/i.test(m.name))
+    .map(m => m.name.replace(/^models\//, '')).sort();
 }
 
-export async function analyseDrawing(opts: { apiKey: string; model: string; imageDataUrl: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string }> {
+// ---- text route (Groq, no images): message content is always a plain string
+export function buildTextPrompt(hint: string, pageText: string): string {
+  return `Below is the text extracted from ONE page of a construction drawing (PDF text layer or OCR). Positions are lost, so it is a list of labels, dimension strings, schedule rows and notes.\n` +
+    `Only use numbers that appear in this text. If the text does not contain a value, use null and add a warning. Do not invent door or window counts: count only marks or schedule rows that appear.\n` +
+    `${hint ? `Context from the user: ${hint}\n` : ''}` +
+    `Rules:\n- Dimensions may be in mm or m: output metres for *M fields and millimetres for *Mm fields.\n- If a door/window schedule is present, use its mark, size and quantity.\n- Include every room name that appears.\nReturn exactly this JSON shape:\n${SCHEMA}\n\n----- PAGE TEXT -----\n${pageText.slice(0, 24000)}`;
+}
+
+export async function analyseText(opts: { apiKey: string; model: string; pageText: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string; modelUsed: string }> {
+  const model = resolveModel('groq-text', opts.model);
   const body: Record<string, unknown> = {
-    model: opts.model, temperature: 0, max_completion_tokens: 3000,
-    messages: [
-      { role: 'system', content: SYSTEM },
-      { role: 'user', content: [{ type: 'text', text: buildPrompt(opts.hint) }, { type: 'image_url', image_url: { url: opts.imageDataUrl } }] },
-    ],
+    model, temperature: 0, max_completion_tokens: 8000,
+    messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: buildTextPrompt(opts.hint, opts.pageText) }],
     response_format: { type: 'json_object' },
   };
   let json: any;
-  try { json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal); }
+  try { json = await groqPost(opts.apiKey, '/chat/completions', body, opts.signal); }
   catch (e) {
-    // some models reject JSON mode together with images: retry once in plain mode
-    if ((e as any).status === 400 && /response_format|json/i.test(String((e as any).detail))) {
-      delete body.response_format; json = await post(`${GROQ_BASE}/chat/completions`, opts.apiKey, body, opts.signal);
-    } else throw e;
+    if ((e as any).status === 400 && /response_format|json_object|json mode/i.test(String((e as any).detail))) { delete body.response_format; json = await groqPost(opts.apiKey, '/chat/completions', body, opts.signal); }
+    else if (/decommission|deprecat|no longer supported|not found|does not exist|model_not_found/i.test(String((e as any).detail ?? ''))) throw new Error(`Groq model "${model}" is not available on your account. Use "Check key and list models" and pick another text model.`);
+    else throw e;
   }
   const raw: string = json?.choices?.[0]?.message?.content ?? '';
-  const ex = normalise(extractJson(raw));
-  ex.warnings.push(...crossCheck(ex));
-  return { extraction: ex, raw };
+  if (!raw.trim()) throw new Error(`${model} returned an empty reply. Try again.`);
+  const ex = normalise(extractJson(raw)); ex.warnings.push(...crossCheck(ex));
+  return { extraction: ex, raw, modelUsed: model };
+}
+
+// ---- vision route (Gemini free tier)
+export async function analyseGemini(opts: { apiKey: string; model: string; imageDataUrl: string; hint: string; signal?: AbortSignal }): Promise<{ extraction: AiExtraction; raw: string; modelUsed: string }> {
+  const m = /^data:([^;]+);base64,(.*)$/.exec(opts.imageDataUrl); if (!m) throw new Error('Internal error: the page image was not a data URL.');
+  const call = (model: string) => send('Google AI', `${GEMINI_BASE}/models/${model}:generateContent`, {
+    method: 'POST', signal: opts.signal, headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: 'user', parts: [{ text: buildPrompt(opts.hint) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: 'application/json' },
+    }),
+  });
+  let model = resolveModel('gemini', opts.model), json: any;
+  try { json = await call(model); }
+  catch (e) {
+    const st = (e as any).status;
+    if (st !== 404 && st !== 400) throw e;
+    // model name retired or renamed: pick the first current Flash model your key can use
+    const list = await listGeminiModels(opts.apiKey);
+    const alt = list.find(x => /flash-lite/.test(x) && !/preview|exp/.test(x)) ?? list.find(x => /flash/.test(x) && !/preview|exp/.test(x)) ?? list.find(x => /flash/.test(x));
+    if (!alt || alt === model) throw e;
+    model = alt; json = await call(model);
+  }
+  const raw: string = (json?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('');
+  if (!raw.trim()) throw new Error(`Gemini returned no text (${json?.candidates?.[0]?.finishReason ?? json?.promptFeedback?.blockReason ?? 'unknown reason'}).`);
+  const ex = normalise(extractJson(raw)); ex.warnings.push(...crossCheck(ex));
+  return { extraction: ex, raw, modelUsed: model };
+}
+
+/** Live check with the person's real key. */
+export async function testProvider(provider: Provider, apiKey: string, model: string): Promise<{ ok: boolean; modelUsed: string; message: string }> {
+  try {
+    if (provider === 'groq-text') {
+      const m = resolveModel(provider, model);
+      const j = await groqPost(apiKey, '/chat/completions', { model: m, temperature: 0, max_completion_tokens: 500, messages: [{ role: 'user', content: 'Reply with only the number 4817.' }] });
+      const out = String(j?.choices?.[0]?.message?.content ?? '');
+      return out.includes('4817') ? { ok: true, modelUsed: m, message: `${m} works with your Groq key (text route).` } : { ok: false, modelUsed: m, message: `${m} replied "${out.slice(0, 60)}".` };
+    }
+    const c = document.createElement('canvas'); c.width = 320; c.height = 120;
+    const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, 320, 120); g.fillStyle = '#000'; g.font = 'bold 72px sans-serif'; g.fillText('4817', 40, 88);
+    const body = (mm: string) => send('Google AI', `${GEMINI_BASE}/models/${mm}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'What number is written in this image? Digits only.' }, { inline_data: { mime_type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.9).split(',')[1] } }] }] }) });
+    let m = resolveModel('gemini', model), j: any;
+    try { j = await body(m); } catch (e) {
+      if ((e as any).status !== 404 && (e as any).status !== 400) throw e;
+      const list = await listGeminiModels(apiKey); const alt = list.find(x => /flash/.test(x) && !/preview|exp/.test(x)) ?? list.find(x => /flash/.test(x)); if (!alt) throw e; m = alt; j = await body(m);
+    }
+    const out = (j?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('');
+    return out.includes('4817') ? { ok: true, modelUsed: m, message: `${m} can read images with your Google key.` } : { ok: false, modelUsed: m, message: `${m} answered "${out.trim().slice(0, 60)}", not 4817.` };
+  } catch (e) { return { ok: false, modelUsed: model, message: (e as Error).message }; }
 }

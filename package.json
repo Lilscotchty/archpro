@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:sim": "tsx tests/sim-model.test.ts && tsx tests/sim-view.headless.test.tsx"
+    "test:sim": "tsx tests/sim-model.test.ts && tsx tests/sim-view.headless.test.tsx && tsx tests/sim-hip.test.ts",
+    "test:drafting": "tsx scripts/drafting-selftest.ts"
   },
   "dependencies": {
     "@google/genai": "^1.32.0",
@@ -16,7 +17,8 @@
     "playcanvas": "^2.24.1",
     "qrcode.react": "^4.0.1",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react-dom": "^19.2.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

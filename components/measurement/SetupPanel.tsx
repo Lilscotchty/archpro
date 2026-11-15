@@ -2,7 +2,7 @@
 import React from 'react';
 import { BoqState } from './useBoqState';
 import { Card, Check, Lbl, NumInput, Select, TextInput } from './fields';
-import { UI } from '../ui';
+import { UI, tint } from '../ui';
 import { Assumptions } from '../../utils/boq/types';
 
 export const SetupPanel: React.FC<{ s: BoqState }> = ({ s }) => {
@@ -20,11 +20,6 @@ export const SetupPanel: React.FC<{ s: BoqState }> = ({ s }) => {
 
   return (
     <div className="max-w-5xl mx-auto grid gap-3">
-      {g.warnings.length > 0 && (
-        <div className="border rounded-[3px] p-3 text-xs space-y-1" style={{ borderColor: UI.warn + '88', color: UI.warn }}>
-          {g.warnings.map((w, i) => <div key={i}>{w}</div>)}
-        </div>
-      )}
       <Card title="Project">
         <Lbl label="Project name"><TextInput value={a.projectName} onChange={v => set({ projectName: v })} /></Lbl>
         <Lbl label="Location"><TextInput value={a.location} onChange={v => set({ location: v })} /></Lbl>

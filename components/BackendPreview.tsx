@@ -16,18 +16,18 @@ export const BackendPreview: React.FC<BackendPreviewProps> = ({ onClose }) => {
 
   return (
     <div className="absolute inset-0 z-50 grid place-items-center p-8" style={{ background: 'rgba(10,11,13,.8)' }}>
-      <div style={{ background: UI.panel, borderColor: UI.rule, color: UI.text }} className="w-full max-w-5xl h-[85vh] border rounded-[3px] flex flex-col">
+      <div style={{ background: UI.panel, borderColor: UI.rule, color: UI.text }} className="w-full max-w-5xl h-[85vh] border rounded-[var(--ui-r)] flex flex-col">
         <header style={{ borderColor: UI.rule }} className="h-11 px-3 flex items-center gap-3 border-b shrink-0">
           <span className="font-semibold">Backend specification</span>
           <span style={{ color: UI.dim }} className="text-xs">Python cloud function &amp; Firestore schema for this project</span>
           <div className="flex-1" />
-          <button onClick={onClose} className="p-1 hover:text-white" title="Close"><Icon n="close" s={16} /></button>
+          <button onClick={onClose} className="p-1 hover:text-[var(--ui-strong)]" title="Close"><Icon n="close" s={16} /></button>
         </header>
 
         <div style={{ borderColor: UI.rule }} className="flex border-b shrink-0">
           {BACKEND_SPECS.map((spec, i) => (
             <button key={i} onClick={() => setActiveTab(i)}
-              className={`px-4 py-2 text-xs border-r ${activeTab === i ? 'bg-[#4aa3ff] text-[#06121f] font-medium' : 'hover:bg-white/5'}`}
+              className={`px-4 py-2 text-xs border-r ${activeTab === i ? 'bg-[var(--ui-accent)] text-[var(--ui-accentInk)] font-medium' : 'hover:bg-[var(--ui-hover)]'}`}
               style={{ borderColor: UI.rule, fontFamily: MONO }}>{spec.fileName}</button>
           ))}
         </div>

@@ -9,15 +9,15 @@ const uid = () => crypto.randomUUID();
 const th = 'px-2 py-1.5 text-left font-medium text-[11px]';
 const srcTag = (s: string) => <Tag tone={s === 'ai' ? 'warn' : s === 'plan' ? 'ok' : 'dim'}>{s}</Tag>;
 const Table: React.FC<{ title: string; hint?: string; head: string[]; onAdd: () => void; children: React.ReactNode }> = ({ title, hint, head, onAdd, children }) => (
-  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px]">
+  <div style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[var(--ui-r)]">
     <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: UI.rule }}>
-      <div><div className="text-xs font-semibold" style={{ color: '#e6e9ed' }}>{title}</div>{hint && <div className="text-[11px]" style={{ color: UI.dim }}>{hint}</div>}</div>
+      <div><div className="text-xs font-semibold" style={{ color: 'var(--ui-strong)' }}>{title}</div>{hint && <div className="text-[11px]" style={{ color: UI.dim }}>{hint}</div>}</div>
       <button className={btnGhost} onClick={onAdd}><span className="inline-flex items-center gap-1"><Icon n="plus" s={13} />Add</span></button>
     </div>
     <div className="overflow-x-auto"><table className="w-full text-xs"><thead style={{ color: UI.dim }}><tr>{head.map(h => <th key={h} className={th}>{h}</th>)}<th /></tr></thead><tbody>{children}</tbody></table></div>
   </div>
 );
-const Del: React.FC<{ onClick: () => void }> = ({ onClick }) => <button onClick={onClick} title="Delete row" style={{ color: UI.dim }} className="p-1 hover:text-white"><Icon n="trash" s={14} /></button>;
+const Del: React.FC<{ onClick: () => void }> = ({ onClick }) => <button onClick={onClick} title="Delete row" style={{ color: UI.dim }} className="p-1 hover:text-[var(--ui-strong)]"><Icon n="trash" s={14} /></button>;
 const td = 'px-2 py-1';
 
 export const SchedulePanel: React.FC<{ s: BoqState; hasPlan: boolean }> = ({ s, hasPlan }) => {
@@ -33,7 +33,7 @@ export const SchedulePanel: React.FC<{ s: BoqState; hasPlan: boolean }> = ({ s, 
       <div className="flex items-center gap-2 flex-wrap">
         <button className={btnPrimary} onClick={s.importFromPlan} disabled={!hasPlan}>Import from Drafting Studio</button>
         <span className="text-[11px]" style={{ color: UI.dim }}>
-          {hasPlan ? 'Replaces rows marked plan; rows you added or the AI added are kept.' : 'No walls drawn in the Drafting Studio yet. Draw a plan there, or add rows here, or read a drawing on the AI tab.'}
+          {hasPlan ? 'Replaces rows marked plan; rows you added or the AI added are kept.' : 'No walls drawn in the Drafting Studio yet. Draw a plan there, or add rows here, or read a drawing in the Drawing step.'}
         </span>
         <span className="flex-1" />
         <span className="text-[11px]" style={{ color: UI.dim, fontFamily: 'ui-monospace, monospace' }}>external {extLen.toFixed(2)} m · internal {intLen.toFixed(2)} m</span>

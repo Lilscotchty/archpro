@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ArchPro</title>
+    <style>
+      :root { color-scheme: dark;
+        --ui-bg:#15171a; --ui-panel:#1f2227; --ui-raised:#181a1e; --ui-sunken:#0f1113; --ui-rule:rgba(255,255,255,.09); --ui-text:#c9cfd6; --ui-dim:#7d8590; --ui-strong:#e6e9ed;
+        --ui-accent:#4aa3ff; --ui-accentInk:#06121f; --ui-danger:#e5484d; --ui-dangerText:#ff9ea1; --ui-warn:#f5b83d; --ui-warnTint:#3a2f12; --ui-ok:#3ddb8a;
+        --ui-r:8px; --ui-shadow:0 1px 2px rgba(0,0,0,.25); --ui-hover:rgba(255,255,255,.05); --ui-hover2:rgba(255,255,255,.10); --ui-scroll:#2e333a; --ui-scrollHover:#3b424b; }
+      :root[data-theme="light"] { color-scheme: light;
+        --ui-bg:#f3f5f8; --ui-panel:#ffffff; --ui-raised:#eceff3; --ui-sunken:#dfe4ea; --ui-rule:rgba(15,23,32,.10); --ui-text:#2b323b; --ui-dim:#5b6673; --ui-strong:#0f1720;
+        --ui-accent:#0b6fe0; --ui-accentInk:#ffffff; --ui-danger:#c9272d; --ui-dangerText:#b42318; --ui-warn:#a85a00; --ui-warnTint:#fdf0d2; --ui-ok:#15803d;
+        --ui-r:8px; --ui-shadow:0 1px 2px rgba(15,23,32,.06), 0 1px 1px rgba(15,23,32,.04); --ui-hover:rgba(15,23,32,.06); --ui-hover2:rgba(15,23,32,.10); --ui-scroll:#c3cad3; --ui-scrollHover:#a9b2bd; }
+    </style>
+    <script>try{if(localStorage.getItem('archpro.theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
@@ -28,26 +39,19 @@
       }
     </script>
     <style>
-      :root { --bg:#0d0f12; --panel:#171a1f; --raised:#1d2127; --rule:#2a3038; --text:#d6dbe2; --dim:#8a94a2; --accent:#5aaeff; --accent2:#7c8cff; }
+      body { background-color: var(--ui-bg); color: var(--ui-text); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: var(--ui-bg); }
+      ::-webkit-scrollbar-thumb { background: var(--ui-scroll); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--ui-scrollHover); }
       html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-      body { background: radial-gradient(1200px 600px at 12% -10%, rgba(90,174,255,.10), transparent 60%), radial-gradient(900px 500px at 100% 0%, rgba(124,140,255,.08), transparent 55%), #0d0f12; background-attachment: fixed; color: var(--text); font-family: 'IBM Plex Sans','Segoe UI',system-ui,sans-serif; font-size: 16px; }
-      ::selection { background: rgba(90,174,255,.35); }
-      ::-webkit-scrollbar { width: 10px; height: 10px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #2a3038; border-radius: 6px; border: 2px solid #0d0f12; }
-      ::-webkit-scrollbar-thumb:hover { background: #3a424d; }
-      /* readable type: the arbitrary tiny sizes used around the app get a floor, and the 13px studio root grows */
+      /* readable type: tiny arbitrary sizes get a floor and the 13px studio roots grow */
       .text-\[10px\] { font-size: 12.5px !important; }
       .text-\[11px\] { font-size: 13.5px !important; }
       [style*="font-size: 13px"] { font-size: 15px !important; }
-      /* feel: smooth, tactile, accessible */
-      button, a, select, input { transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .12s ease, filter .15s ease; }
-      button:not(:disabled):active { transform: translateY(1px) scale(.99); }
-      button { cursor: pointer; }
-      button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-      input:focus, select:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(90,174,255,.18); }
-      @keyframes aurora { 0% { transform: translate3d(-4%,-2%,0) scale(1); } 50% { transform: translate3d(4%,3%,0) scale(1.12); } 100% { transform: translate3d(-4%,-2%,0) scale(1); } }
-      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+      /* feel: smooth transitions, visible keyboard focus, reduced-motion respected */
+      button, a, select, input { transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, filter .15s ease; }
+      button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
     </style>
   </head>

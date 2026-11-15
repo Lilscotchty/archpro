@@ -17,8 +17,8 @@ export function download(name: string, text: string, type = 'text/csv') {
   setTimeout(() => URL.revokeObjectURL(a.href), 3000);
 }
 
-export function billCsv(s: Summary, mk: Markups, a: Assumptions): string {
-  const rows: (string | number)[][] = [['Project', a.projectName], ['Location', a.location], ['Currency', a.currency], [],
+export function billCsv(s: Summary, mk: Markups, a: Assumptions, note = ''): string {
+  const rows: (string | number)[][] = [['Project', a.projectName], ['Location', a.location], ['Currency', a.currency], ...(note ? [['NOTE', note]] : []), [],
     ['Ref', 'Description', 'Quantity', 'Unit', 'Rate', 'Amount', 'Basis', 'Workings']];
   s.sections.forEach(sec => {
     rows.push([sec.code, sec.title.toUpperCase()]);
@@ -35,7 +35,7 @@ export function billCsv(s: Summary, mk: Markups, a: Assumptions): string {
   return rows.map(r => r.map(esc).join(',')).join('\n');
 }
 
-export function printBill(s: Summary, mk: Markups, a: Assumptions, gfa: number) {
+export function printBill(s: Summary, mk: Markups, a: Assumptions, gfa: number, note = '') {
   const cur = a.currency;
   const body = s.sections.map(sec => `
     <h2>${html(sec.code)} &nbsp; ${html(sec.title)}</h2>
@@ -50,6 +50,7 @@ export function printBill(s: Summary, mk: Markups, a: Assumptions, gfa: number) 
     .tot td{font-weight:700;border-top:1px solid #111;border-bottom:none} .meta{color:#444;margin-bottom:14px} .grand td{font-weight:700;font-size:13px;border-top:2px solid #111} ol{padding-left:16px} li{margin-bottom:3px}
     .pb{page-break-before:always}</style></head><body>
     <h1>BILL OF QUANTITIES</h1><div class="meta">${html(a.projectName)}${a.location ? ' &middot; ' + html(a.location) : ''} &middot; Gross floor area ${plain(gfa)} m&sup2; &middot; ${new Date().toLocaleDateString('en-GB')} &middot; Prepared with ArchPro (SMM7 work sections)</div>
+    ${note ? `<div style="border:2px solid #b00;color:#b00;padding:6px 8px;margin-bottom:10px;font-weight:600">${html(note)}</div>` : ''}
     ${body}
     <div class="pb"></div><h1>GENERAL SUMMARY</h1><div class="meta">Currency: ${html(cur)}</div>
     <table><thead><tr><th class="ref">Section</th><th>Description</th><th class="n">Amount</th></tr></thead><tbody>${sumRows}

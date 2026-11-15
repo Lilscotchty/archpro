@@ -102,7 +102,7 @@ export interface BoqLine {
   basis: Basis;
 }
 
-export interface RateItem { label: string; unit: string; rate: number }
+export interface RateItem { label: string; unit: string; rate: number; source?: string; updated?: string }   // no `updated` = placeholder
 export type RateLibrary = Record<string, RateItem>;
 
 export interface LineOverride { qty?: number; rate?: number; omit?: boolean }

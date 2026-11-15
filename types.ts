@@ -39,6 +39,28 @@ export interface ArchElement {
   gridRef: string; // e.g., "A-1" to "A-2"
   sill?: number;   // mm – windows only (3D model)
   height?: number; // mm – doors / windows (3D model)
+  flip?: boolean;   // doors: swing to the other side of the wall
+  mirror?: boolean; // doors: hinge on the other jamb
+}
+
+/**
+ * A traced drawing (image or PDF page) placed in model space.
+ * Model coordinates are always real millimetres; the underlay carries its own scale.
+ */
+export interface Underlay {
+  mmPerPx: number;       // real millimetres represented by one image pixel
+  x: number;             // model position (mm) of the image's top-left corner
+  y: number;
+  rot: number;           // degrees, clockwise on screen
+  opacity: number;       // 0..1
+  visible: boolean;
+  calibrated: boolean;   // false until the user sets the scale
+  method: string;        // how the scale was set, for display
+  name: string;
+  kind: 'image' | 'pdf';
+  paperMm?: { w: number; h: number }; // physical page size, known for PDFs
+  page?: number;
+  numPages?: number;
 }
 
 export interface RoofSettings {
@@ -92,6 +114,7 @@ export interface ProjectState {
   specs: BuildingSpecs;
 
   generatedImageSrc: string | null;
+  underlay?: Underlay;
   settings: ProjectSettings;
   // Legacy support for calculation
   calculatedTrenchLength?: number;

@@ -45,6 +45,7 @@ export const SimView: React.FC<SimViewProps> = props => {
   const nodes = useRef<Node[]>([]);
   const mats = useRef<{ base: Map<MatKey, StandardMaterial>; sel: Map<MatKey, StandardMaterial> }>({ base: new Map(), sel: new Map() });
   const latest = useRef(props); latest.current = props;
+  const framed = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +62,7 @@ export const SimView: React.FC<SimViewProps> = props => {
     }
     appRef.current = app;
     app.setCanvasFillMode(FILLMODE_NONE);
-    app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    app.graphicsDevice.maxPixelRatio = 3;
     app.scene.ambientLight = new Color(0.4, 0.41, 0.45);
 
     const camera = new Entity('Camera');
@@ -78,12 +79,23 @@ export const SimView: React.FC<SimViewProps> = props => {
     const sun = new Entity('Sun');
     sun.addComponent('light', {
       type: 'directional', color: new Color(1, 0.96, 0.9), intensity: 1.15, castShadows: true,
-      shadowType: SHADOW_PCF3_32F, shadowResolution: 2048, shadowDistance: 80, normalOffsetBias: 0.04, shadowBias: 0.15,
+      shadowType: SHADOW_PCF3_32F, shadowResolution: 4096, shadowDistance: 80, normalOffsetBias: 0.04, shadowBias: 0.15,
     });
     app.root.addChild(sun);
     sunRef.current = sun;
 
-    const resize = () => { const r = wrap.getBoundingClientRect(); if (r.width > 0 && r.height > 0) app.resizeCanvas(Math.floor(r.width), Math.floor(r.height)); };
+    // Render at 2x (or the screen's own ratio if higher, up to 3x) and let the browser scale down: supersampling removes the
+    // soft, jagged look on standard-density screens, where PlayCanvas would otherwise render 1 pixel per CSS pixel.
+    const resize = () => {
+      const r = wrap.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) return;
+      const w = Math.floor(r.width), h = Math.floor(r.height);
+      app.resizeCanvas(w, h);
+      const ratio = Math.min(3, Math.max(window.devicePixelRatio || 1, 2));
+      const W = Math.floor(w * ratio), H = Math.floor(h * ratio), dev = app.graphicsDevice;
+      if (dev.canvas.width !== W || dev.canvas.height !== H) dev.setResolution(W, H);
+      canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+    };
     const ro = new ResizeObserver(resize); ro.observe(wrap); resize();
 
     // simple 1 m ground grid drawn every frame
@@ -172,7 +184,8 @@ export const SimView: React.FC<SimViewProps> = props => {
     const ext = Math.max(model.max[0] - model.min[0], model.max[2] - model.min[2], model.max[1] - model.min[1], 6);
     if (sunRef.current?.light) sunRef.current.light.shadowDistance = ext * 3;
     refreshState();
-    frame();
+    // frame the camera once, when the model first has real geometry; later edits keep the view where the user left it
+    if (!framed.current && model.stats.tris > 0) { framed.current = true; frame(); }
   }, [ready, props.model]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------- state that does not need a rebuild
@@ -212,9 +225,9 @@ export const SimView: React.FC<SimViewProps> = props => {
   useEffect(() => { if (ready) frame(); }, [props.frameKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={wrapRef} className="absolute inset-0 overflow-hidden" style={{ background: '#131519' }}>
+    <div ref={wrapRef} className="absolute inset-0 overflow-hidden" style={{ background: 'var(--ui-sunken)' }}>
       <canvas ref={canvasRef} style={{ display: 'block', touchAction: 'none', outline: 'none' }} />
-      {error && <div className="absolute inset-0 grid place-items-center text-sm" style={{ color: '#c9cfd6' }}>{error}</div>}
+      {error && <div className="absolute inset-0 grid place-items-center text-sm" style={{ color: 'var(--ui-text)' }}>{error}</div>}
     </div>
   );
 };
