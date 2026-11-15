@@ -3,7 +3,7 @@
 // The model only READS what is printed on the drawing. Nothing it returns reaches the bill until the
 // user has reviewed it on the Schedule tab, and every value is sanity-checked first.
 
-import { Assumptions, BoqModel, OpeningRow, WallRow } from './types';
+import { Assumptions, BoqModel, CeilingType, ColumnRow, FloorFinish, OpeningRow, RoofCovering, RoofType, WallRow } from './types';
 
 // Two free routes. 'gemini' reads the page image directly (Google AI Studio free tier). 'groq-text' never sends an image:
 // the page text is extracted in the browser (PDF text layer, or free in-browser OCR for scans) and a text model structures it.
@@ -29,6 +29,9 @@ export interface AiExtraction {
   rooms: { name: string; lengthM: number | null; widthM: number | null; areaM2: number | null }[];
   heights: { floorHeightMm: number | null; plinthMm: number | null; foundationDepthMm: number | null };
   floors: number | null;
+  roof: { type: RoofType | null; pitchDeg: number | null; covering: RoofCovering | null };
+  columns: { label: string; bMm: number; dMm: number; count: number }[];
+  stairs: number | null; ceiling: CeilingType | null; floorFinish: FloorFinish | null;
   specs: string[];
   warnings: string[];
 }
@@ -36,6 +39,7 @@ export interface AiExtraction {
 export const EMPTY_EXTRACTION: AiExtraction = {
   drawingType: 'unknown', scale: null, overall: { lengthM: null, widthM: null }, walls: [], doors: [], windows: [], rooms: [],
   heights: { floorHeightMm: null, plinthMm: null, foundationDepthMm: null }, floors: null, specs: [], warnings: [],
+  roof: { type: null, pitchDeg: null, covering: null }, columns: [], stairs: null, ceiling: null, floorFinish: null,
 };
 
 const SYSTEM = `You are a quantity surveyor's assistant that READS construction drawings. You never estimate or guess.
@@ -53,6 +57,11 @@ const SCHEMA = `{
  "doors":   [ { "mark": "D1", "widthMm": number, "heightMm": number or null, "count": integer, "external": true | false | null, "description": string or null } ],
  "windows": [ { "mark": "W1", "widthMm": number, "heightMm": number or null, "count": integer, "external": true | false | null, "description": string or null } ],
  "heights": { "floorHeightMm": number or null, "plinthMm": number or null, "foundationDepthMm": number or null },
+ "roof": { "type": "gable | hip | shed | flat | null", "pitchDeg": degrees printed on an elevation or section or null, "covering": "aluminium_sheet | concrete_tile | null" },
+ "columns": [ { "label": "C1", "bMm": number, "dMm": number, "count": integer } ],
+ "stairs": number of staircases shown or null,
+ "ceiling": "pvc | plasterboard | none | null (only if a note or finishes schedule says so)",
+ "floorFinish": "ceramic_tile | screed_only | none | null (only if a note or finishes schedule says so)",
  "specs": [ "short quotes of notes that affect quantities or pricing: concrete grade, block size, roof covering, finishes" ],
  "warnings": [ "anything unreadable, cropped, or contradictory" ]
 }`;
@@ -101,6 +110,15 @@ export function normalise(raw: unknown): AiExtraction {
     lengthM: num(w?.lengthM) ?? 0, thicknessMm: num(w?.thicknessMm),
   })).filter(w => w.lengthM > 0.3 && w.lengthM < 200);
   const L = num(r.overall?.lengthM), B = num(r.overall?.widthM);
+  const rt = str(r.roof?.type).toLowerCase(), rc = str(r.roof?.covering).toLowerCase(), pd = num(r.roof?.pitchDeg);
+  const roof = {
+    type: (/hip/.test(rt) ? 'hip' : /gable|pitch/.test(rt) ? 'gable' : /shed|mono|lean/.test(rt) ? 'shed' : /flat/.test(rt) ? 'flat' : null) as RoofType | null,
+    pitchDeg: pd !== null && pd >= 3 && pd <= 60 ? pd : null,
+    covering: (/tile/.test(rc) ? 'concrete_tile' : /alumin|sheet|zinc|iron|long/.test(rc) ? 'aluminium_sheet' : null) as RoofCovering | null,
+  };
+  const columns = (Array.isArray(r.columns) ? r.columns : []).map((c: any) => ({ label: str(c?.label) || 'C', bMm: num(c?.bMm) ?? 0, dMm: num(c?.dMm) ?? 0, count: Math.max(1, Math.round(num(c?.count) ?? 1)) }))
+    .filter((c: { bMm: number; dMm: number; count: number }) => c.bMm >= 100 && c.bMm <= 1500 && c.dMm >= 100 && c.dMm <= 1500 && c.count <= 200);
+  const st = num(r.stairs), cl = str(r.ceiling).toLowerCase(), ff = str(r.floorFinish).toLowerCase();
   const ex: AiExtraction = {
     drawingType: str(r.drawingType) || 'unknown', scale: str(r.scale) || null,
     floors: (() => { const f = num(r.floors); return f && f >= 1 && f <= 10 ? Math.round(f) : null; })(),
@@ -110,6 +128,9 @@ export function normalise(raw: unknown): AiExtraction {
     doors: list('doors').map(o => opening(o, 'door')).filter((o): o is AiOpening => !!o),
     windows: list('windows').map(o => opening(o, 'window')).filter((o): o is AiOpening => !!o),
     heights: { floorHeightMm: num(r.heights?.floorHeightMm), plinthMm: num(r.heights?.plinthMm), foundationDepthMm: num(r.heights?.foundationDepthMm) },
+    roof, columns, stairs: st !== null && st >= 0 && st <= 6 ? Math.round(st) : null,
+    ceiling: /pvc/.test(cl) ? 'pvc' : /plaster/.test(cl) ? 'plasterboard' : /none|no ceiling/.test(cl) ? 'none' : null,
+    floorFinish: /tile|ceramic|porcelain/.test(ff) ? 'ceramic_tile' : /screed|cement/.test(ff) ? 'screed_only' : /none/.test(ff) ? 'none' : null,
     specs: Array.isArray(r.specs) ? r.specs.map(str).filter(Boolean).slice(0, 20) : [],
     warnings,
   };
@@ -144,7 +165,7 @@ export function crossCheck(ex: AiExtraction): string[] {
 /** Merge results from several pages: schedules and plans often repeat the same marks, so take the larger count, not the sum. */
 export function mergeExtractions(list: AiExtraction[]): AiExtraction {
   if (list.length === 0) return EMPTY_EXTRACTION;
-  const out: AiExtraction = { ...EMPTY_EXTRACTION, overall: { lengthM: null, widthM: null }, heights: { ...EMPTY_EXTRACTION.heights }, walls: [], doors: [], windows: [], rooms: [], specs: [], warnings: [] };
+  const out: AiExtraction = { ...EMPTY_EXTRACTION, overall: { lengthM: null, widthM: null }, heights: { ...EMPTY_EXTRACTION.heights }, walls: [], doors: [], windows: [], rooms: [], specs: [], warnings: [], roof: { ...EMPTY_EXTRACTION.roof }, columns: [] };
   const byMark = (a: AiOpening[], b: AiOpening[]) => {
     const map = new Map(a.map(o => [`${o.mark.toLowerCase()}|${o.widthMm}`, o]));
     b.forEach(o => { const k = `${o.mark.toLowerCase()}|${o.widthMm}`; const e = map.get(k);
@@ -156,6 +177,9 @@ export function mergeExtractions(list: AiExtraction[]): AiExtraction {
     out.scale = out.scale ?? x.scale; out.floors = out.floors ?? x.floors;
     out.overall.lengthM = out.overall.lengthM ?? x.overall.lengthM; out.overall.widthM = out.overall.widthM ?? x.overall.widthM;
     if (x.walls.length > out.walls.length) out.walls = x.walls;
+    if (x.columns.length > out.columns.length) out.columns = x.columns;
+    out.roof = { type: out.roof.type ?? x.roof.type, pitchDeg: out.roof.pitchDeg ?? x.roof.pitchDeg, covering: out.roof.covering ?? x.roof.covering };
+    out.stairs = out.stairs ?? x.stairs; out.ceiling = out.ceiling ?? x.ceiling; out.floorFinish = out.floorFinish ?? x.floorFinish;
     out.doors = byMark(out.doors, x.doors); out.windows = byMark(out.windows, x.windows);
     const seen = new Set(out.rooms.map(r => r.name.toLowerCase()));
     x.rooms.forEach(r => { if (!seen.has(r.name.toLowerCase())) { out.rooms.push(r); seen.add(r.name.toLowerCase()); } });
@@ -196,14 +220,22 @@ export function applyExtraction(ex: AiExtraction, model: BoqModel, a: Assumption
   const open = [...toRows(ex.doors, 'door'), ...toRows(ex.windows, 'window')];
   if (open.length) summary.push(`${open.length} door/window types`);
 
+  const cols: ColumnRow[] = ex.columns.map((c, i) => ({ id: uid(), label: c.label || `C${i + 1}`, bMm: Math.round(c.bMm), dMm: Math.round(c.dMm), qty: c.count, source: 'ai' as const }));
+  if (cols.length) summary.push(`${cols.reduce((n, c) => n + c.qty, 0)} columns`);
   const next: Assumptions = { ...a };
+  if (ex.roof.type) { next.roofType = ex.roof.type; summary.push(`${ex.roof.type} roof`); }
+  if (ex.roof.pitchDeg) next.roofPitch = Math.round(ex.roof.pitchDeg);
+  if (ex.roof.covering) next.roofCovering = ex.roof.covering;
+  if (ex.stairs !== null) next.stairCount = ex.stairs;
+  if (ex.ceiling) next.ceiling = ex.ceiling;
+  if (ex.floorFinish) next.floorFinish = ex.floorFinish;
   if (ex.floors) { next.floors = ex.floors; summary.push(`${ex.floors} storey(s)`); }
   if (ex.heights.floorHeightMm) next.floorHeight = Math.round(ex.heights.floorHeightMm);
   if (ex.heights.plinthMm !== null) next.plinthHeight = Math.round(ex.heights.plinthMm);
   if (ex.heights.foundationDepthMm) next.foundationDepth = Math.round(ex.heights.foundationDepthMm);
   if (ex.heights.floorHeightMm || ex.heights.plinthMm !== null || ex.heights.foundationDepthMm) summary.push('levels');
 
-  return { model: { ...model, walls, footprint, openings: [...keep(model.openings), ...open] }, assumptions: next, summary };
+  return { model: { ...model, walls, footprint, openings: [...keep(model.openings), ...open], columns: [...keep(model.columns), ...cols] }, assumptions: next, summary };
 }
 
 // ---------------------------------------------------------------- provider calls

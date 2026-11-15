@@ -15,7 +15,7 @@ const lsGet = (k: string) => { try { return localStorage.getItem(k) ?? ''; } cat
 const lsSet = (k: string, v: string) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* storage blocked */ } };
 const MAX_PAGES = 4;
 
-export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDrawing?: DrawingMeta | null }> = ({ s, onApplied, initialDrawing }) => {
+export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; onEstimate?: () => void; initialDrawing?: DrawingMeta | null }> = ({ s, onApplied, onEstimate, initialDrawing }) => {
   const [provider, setProvider] = useState<Provider>(lsGet(K_PROV) === 'groq-text' ? 'groq-text' : 'gemini');
   const [key, setKey] = useState(lsGet(kKey(provider)));
   const [remember, setRemember] = useState(!!lsGet(kKey(provider)));
@@ -56,6 +56,7 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
   };
 
   const [test, setTest] = useState('');
+  const [auto, setAuto] = useState(true);
   const runTest = async () => {
     setTest('Testing with your key…'); setError('');
     try { const r = await testProvider(provider, key.trim(), model); setTest((r.ok ? 'OK: ' : 'Failed: ') + r.message); if (r.ok && r.modelUsed !== model) saveModel(r.modelUsed); }
@@ -94,7 +95,8 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
         results.push(extraction); raws.push(r);
         if (modelUsed !== model) { setUsedModel(modelUsed); saveModel(modelUsed); }
       }
-      setResult(mergeExtractions(results)); setRaw(raws);
+      const merged = mergeExtractions(results); setResult(merged); setRaw(raws);
+      if (auto && results.length) { const out = applyExtraction(merged, s.model, s.assumptions, 'replace'); s.setModel(out.model); s.setAssumptions(out.assumptions); onEstimate?.(); }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError((e as Error).message);
       if (results.length) { setResult(mergeExtractions(results)); setRaw(raws); }
@@ -146,7 +148,8 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
         </div>
         <div className="col-span-2"><Lbl label="Hint (optional)" hint="Example: ground floor plan, dimensions in mm, sandcrete blocks, 3 m floor height."><TextInput value={hint} onChange={setHint} /></Lbl></div>
         <div className="col-span-2 flex items-center gap-2">
-          <button className={btnPrimary} onClick={run} disabled={busy}>{busy ? 'Reading…' : 'Read drawing'}</button>
+          <button className={btnPrimary} onClick={run} disabled={busy}>{busy ? 'Reading…' : auto ? 'Read drawing and build estimate' : 'Read drawing'}</button>
+          <Check checked={auto} onChange={setAuto} label="Build the bill straight away" />
           {busy && <button className={btnGhost} onClick={() => abort.current?.abort()}>Stop</button>}
           <span className="text-xs" style={{ color: UI.dim }}>{progress}</span>
         </div>
@@ -175,11 +178,13 @@ export const AiPanel: React.FC<{ s: BoqState; onApplied: () => void; initialDraw
               <div style={{ fontFamily: MONO }}>{result.doors.map(o => `${o.mark} ${o.widthMm}x${o.heightMm ?? '?'} ×${o.count}`).join(' · ') || 'none'}</div>
               <div className="mt-2" style={{ color: UI.dim }}>Windows ({result.windows.reduce((n, o) => n + o.count, 0)})</div>
               <div style={{ fontFamily: MONO }}>{result.windows.map(o => `${o.mark} ${o.widthMm}x${o.heightMm ?? '?'} ×${o.count}`).join(' · ') || 'none'}</div>
+              {(result.roof.type || result.columns.length > 0 || result.stairs !== null) && <><div className="mt-2" style={{ color: UI.dim }}>Roof, columns, stairs</div><div style={{ fontFamily: MONO }}>{[result.roof.type && `${result.roof.type} roof${result.roof.pitchDeg ? ` ${result.roof.pitchDeg}°` : ''}${result.roof.covering ? ` ${result.roof.covering.replace('_', ' ')}` : ''}`, result.columns.length > 0 && `columns ${result.columns.map(c => `${c.label} ${c.bMm}x${c.dMm} ×${c.count}`).join(' · ')}`, result.stairs !== null && `${result.stairs} staircase(s)`].filter(Boolean).join(' | ')}</div></>}
               {result.specs.length > 0 && <><div className="mt-2" style={{ color: UI.dim }}>Notes that affect pricing</div><ul>{result.specs.map((x, i) => <li key={i}>• {x}</li>)}</ul></>}
             </div>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
-            <button className={btnPrimary} onClick={() => apply('replace')}>Apply, replacing plan and AI rows</button>
+            <button className={btnPrimary} onClick={() => { apply('replace'); onEstimate?.(); }}>Apply and open the bill</button>
+            <button className={btnGhost} onClick={() => apply('replace')}>Apply, replacing plan and AI rows</button>
             <button className={btnGhost} onClick={() => apply('add')}>Add to schedule</button>
             <span style={{ color: UI.dim }}>Values you typed yourself are never replaced.</span>
           </div>

@@ -4,6 +4,7 @@ import { BoqState } from './useBoqState';
 import { NumInput, fmt } from './fields';
 import { UI, MONO, inputCls } from '../ui';
 import { scopeNotes } from '../../utils/boq/takeoff';
+import { placeholderStats, rateWarning } from '../../utils/boq/pricing';
 
 export const SummaryView: React.FC<{ s: BoqState }> = ({ s }) => {
   const m = s.summary, mk = s.markups, cur = s.assumptions.currency;
@@ -20,6 +21,7 @@ export const SummaryView: React.FC<{ s: BoqState }> = ({ s }) => {
   );
   return (
     <div className="max-w-4xl mx-auto grid gap-4">
+      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.danger + '88', color: UI.danger }}>{w}</div> : null; })()}
       <div className="grid grid-cols-3 gap-3">
         {[['Net measured works', m.net], ['Tender total', m.grand], [`Per m2 of floor area`, m.perM2]].map(([l, v]) => (
           <div key={l as string} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] px-3 py-2">

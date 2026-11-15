@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { BoqState } from './useBoqState';
 import { NumInput, TextInput, Select, fmt } from './fields';
 import { Empty, Icon, Tag, UI, MONO, btnGhost, btnPrimary, inputCls } from '../ui';
-import { PricedLine } from '../../utils/boq/pricing';
+import { PricedLine, placeholderStats, rateWarning } from '../../utils/boq/pricing';
 import { SECTIONS } from '../../utils/boq/types';
 import { refOf } from '../../utils/boq/export';
 
@@ -25,6 +25,8 @@ export const BillView: React.FC<{ s: BoqState }> = ({ s }) => {
 
   return (
     <div className="max-w-6xl mx-auto grid gap-4">
+      {(() => { const w = rateWarning(placeholderStats(s.priced, s.rates, s.overrides)); return w ? <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.danger + '88', color: UI.danger }}>{w}</div> : null; })()}
+      {(s.model.walls.some(w => w.source === 'ai') || s.model.openings.some(o => o.source === 'ai')) && <div className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.warn + '88', color: UI.warn }}>Quantities include values the AI read from the drawing. Check the Schedule tab against the drawing, then confirm the Setup assumptions (foundation depth, roof, finishes) that the drawing does not show.</div>}
       {s.built.geo.warnings.map((w, i) => <div key={i} className="text-xs border rounded-[3px] p-2" style={{ borderColor: UI.warn + '88', color: UI.warn }}>{w}</div>)}
       {total.map(sec => (
         <div key={sec.code} style={{ borderColor: UI.rule, background: UI.panel }} className="border rounded-[3px] overflow-hidden">

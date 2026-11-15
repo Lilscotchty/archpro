@@ -15,6 +15,7 @@ import { DrawingMeta } from '../utils/drawings/types';
 import { fmt } from './measurement/fields';
 import { Icon, Panel, Rail, Screen, Section, StatusBar, UI, MONO, btnGhost, btnPrimary } from './ui';
 import { billCsv, download, printBill } from '../utils/boq/export';
+import { placeholderStats, rateWarning } from '../utils/boq/pricing';
 
 type Tab = 'setup' | 'schedule' | 'drawings' | 'ai' | 'bill' | 'summary' | 'rates';
 const TITLES: Record<Tab, string> = { setup: 'Setup', schedule: 'Schedule', drawings: 'Drawings', ai: 'AI drawing reader', bill: 'Bill of quantities', summary: 'Summary', rates: 'Rates' };
@@ -29,6 +30,7 @@ export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
   const drawings = useAutoDrawings(project, s.assumptions);
   const hasPlan = project.elements.some(e => (e.type as string) === 'wall');
   const approx = s.built.lines.filter(l => l.basis === 'approx').length;
+  const note = rateWarning(placeholderStats(s.priced, s.rates, s.overrides));
   const slug = (s.assumptions.projectName || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
   const openFile = async (f: File | undefined) => {
@@ -45,8 +47,8 @@ export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
       actions={<>
         <button className={btnGhost} onClick={() => fileRef.current?.click()}>Open</button>
         <button className={btnGhost} onClick={() => download(`${slug}-estimate.json`, JSON.stringify(s.snapshot(), null, 2), 'application/json')}>Save</button>
-        <button className={btnGhost} disabled={!s.summary.sections.length} onClick={() => download(`${slug}-bill-of-quantities.csv`, billCsv(s.summary, s.markups, s.assumptions))}><span className="inline-flex items-center gap-1.5"><Icon n="download" s={14} />CSV</span></button>
-        <button className={btnPrimary} disabled={!s.summary.sections.length} onClick={() => printBill(s.summary, s.markups, s.assumptions, s.built.geo.gfaM2)}>Print / PDF</button>
+        <button className={btnGhost} disabled={!s.summary.sections.length} onClick={() => download(`${slug}-bill-of-quantities.csv`, billCsv(s.summary, s.markups, s.assumptions, note))}><span className="inline-flex items-center gap-1.5"><Icon n="download" s={14} />CSV</span></button>
+        <button className={btnPrimary} disabled={!s.summary.sections.length} onClick={() => printBill(s.summary, s.markups, s.assumptions, s.built.geo.gfaM2, note)}>Print / PDF</button>
         <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={e => openFile(e.target.files?.[0])} />
       </>}
     >
@@ -64,7 +66,7 @@ export const MeasurementModule: React.FC<Props> = ({ project, onClose }) => {
           {tab === 'setup' && <SetupPanel s={s} />}
           {tab === 'schedule' && <SchedulePanel s={s} hasPlan={hasPlan} />}
           {tab === 'drawings' && <DrawingsPanel {...drawings} hasPlan={hasPlan} onUseInAi={m => { setAiDrawing(m); setTab('ai'); }} />}
-          {tab === 'ai' && <AiPanel s={s} onApplied={() => setTab('schedule')} initialDrawing={aiDrawing} />}
+          {tab === 'ai' && <AiPanel s={s} onApplied={() => setTab('schedule')} onEstimate={() => setTab('bill')} initialDrawing={aiDrawing} />}
           {tab === 'bill' && <BillView s={s} />}
           {tab === 'summary' && <SummaryView s={s} />}
           {tab === 'rates' && <RatesView s={s} />}
